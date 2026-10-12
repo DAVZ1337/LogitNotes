@@ -1,4 +1,4 @@
-name: Build and Release Android APK
+name: Build Debug APK
 
 on:
   push:
@@ -6,11 +6,8 @@ on:
       - main
   workflow_dispatch:
 
-env:
-  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx1g"
-
 jobs:
-  build-release:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,51 +22,19 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install required Android SDK components
+      - name: Install Android 36 and build-tools
         run: |
           yes | sdkmanager --licenses || true
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
-      - name: Prepare Gradle
-        uses: gradle/gradle-build-action@v2
-        with:
-          gradle-version: '9.3.1'
-
-      - name: Decode keystore from secret (optional)
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: |
-          if [ -n "${KEYSTORE_BASE64}" ]; then
-            echo "Decoding keystore..."
-            echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/my-upload-key.jks"
-            ls -l "$GITHUB_WORKSPACE/my-upload-key.jks"
-          else
-            echo "No KEYSTORE_BASE64 provided; skipping keystore decode."
-          fi
-
-      - name: Build release APK
-        env:
-          KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      - name: Build debug APK
         run: |
           chmod +x ./gradlew || true
-          if [ -x "./gradlew" ]; then
-            ./gradlew assembleRelease --no-daemon
-          else
-            gradle assembleRelease --no-daemon
-          fi
+          ./gradlew assembleDebug --no-daemon
 
-      - name: Upload release APK as artifact
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: app/build/outputs/apk/release/**/*.apk
-
-      - name: Create GitHub Release and upload APK
-        if: ${{ github.event_name == 'push' }}
-        uses: ncipollo/release-action@v1
-        with:
-          tag: release-${{ github.sha }}
-          files: app/build/outputs/apk/release/*.apk
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          
