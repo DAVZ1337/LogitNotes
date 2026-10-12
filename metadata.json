@@ -1,0 +1,6 @@
+{
+  "name": "LogitNotes",
+  "description": "Bóveda de notas 100% local y segura con cifrado de extremo a extremo AES-256, autenticación biométrica y exportación Markdown.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
