@@ -8,24 +8,40 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
+      - name: Set up Android SDK and required components
         uses: android-actions/setup-android@v3
+        with:
+          api-level: 36
+          build-tools: 36.0.0
+          components: |
+            platform-tools
+            cmdline-tools;latest
 
-      - name: Install Android 36 and build-tools
+      - name: Fallback: ensure cmdline-tools and accept licenses
         run: |
+          export ANDROID_SDK_ROOT=${{ env.ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk }}
+          for i in 1 2 3; do
+            if [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ] || [ -x "$ANDROID_SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager" ]; then
+              echo "sdkmanager found"
+              break
+            fi
+            echo "Attempting to install cmdline-tools (attempt $i)"
+            sdkmanager "cmdline-tools;latest" && break || sleep 3
+          done
           yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools" || true
 
       - name: Build debug APK
         run: |
@@ -37,4 +53,3 @@ jobs:
         with:
           name: app-debug-apk
           path: app/build/outputs/apk/debug/*.apk
-          
