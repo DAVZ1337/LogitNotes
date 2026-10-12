@@ -35,7 +35,7 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Decode keystore from secret
+      - name: Decode keystore from secret (optional)
         if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -63,14 +63,9 @@ jobs:
           name: app-release-apk
           path: app/build/outputs/apk/release/**/*.apk
 
-      - name: Create GitHub Release and upload APK (optional)
+      - name: Create GitHub Release and upload APK
         if: github.event_name == 'push'
-        uses: softprops/action-gh-release@v1
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: release-${{ github.sha }}
-          name: Release ${{ github.sha }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload APK to the Release (optional)
-        if: github.event_name == 'push
+          tag: release-${{ github.sha }}
+          files: app/build/outputs/apk/release/*.apk
