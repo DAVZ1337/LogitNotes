@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build and Release Android APK
 
 on:
   push:
@@ -6,8 +6,11 @@ on:
       - main
   workflow_dispatch:
 
+env:
+  GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx1g"
+
 jobs:
-  build:
+  build-release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -32,16 +35,42 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Build debug APK
+      - name: Decode keystore from secret
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/my-upload-key.jks"
+          ls -l "$GITHUB_WORKSPACE/my-upload-key.jks"
+
+      - name: Build release APK
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          chmod +x ./gradlew || true
           if [ -x "./gradlew" ]; then
-            ./gradlew assembleDebug --no-daemon
+            ./gradlew assembleRelease --no-daemon
           else
-            gradle assembleDebug --no-daemon
+            gradle assembleRelease --no-daemon
           fi
 
-      - name: Upload APK artifact
+      - name: Upload release APK as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: app-release-apk
+          path: app/build/outputs/apk/release/**/*.apk
+
+      - name: Create GitHub Release and upload APK (optional)
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: release-${{ github.sha }}
+          name: Release ${{ github.sha }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload APK to the Release (optional)
+        if: github.event_name == 'push
