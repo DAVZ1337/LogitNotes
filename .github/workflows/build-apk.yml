@@ -36,12 +36,16 @@ jobs:
           gradle-version: '9.3.1'
 
       - name: Decode keystore from secret (optional)
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/my-upload-key.jks"
-          ls -l "$GITHUB_WORKSPACE/my-upload-key.jks"
+          if [ -n "${KEYSTORE_BASE64}" ]; then
+            echo "Decoding keystore..."
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/my-upload-key.jks"
+            ls -l "$GITHUB_WORKSPACE/my-upload-key.jks"
+          else
+            echo "No KEYSTORE_BASE64 provided; skipping keystore decode."
+          fi
 
       - name: Build release APK
         env:
@@ -64,7 +68,7 @@ jobs:
           path: app/build/outputs/apk/release/**/*.apk
 
       - name: Create GitHub Release and upload APK
-        if: github.event_name == 'push'
+        if: ${{ github.event_name == 'push' }}
         uses: ncipollo/release-action@v1
         with:
           tag: release-${{ github.sha }}
