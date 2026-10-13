@@ -90,6 +90,8 @@ fun LockScreen(
     val vaultOwnerName by viewModel.vaultOwnerName.collectAsState()
 
     var vaultNameInput by remember { mutableStateOf("") }
+    var storageOption by remember { mutableStateOf("DOCUMENTS") }
+    var customPathInput by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var enableBiometrics by remember { mutableStateOf(viewModel.isBiometricAvailable) }
@@ -337,32 +339,186 @@ fun LockScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // 2. Almacenamiento Interno Privado (Único modo seguro)
+                        // 2. Carpeta donde se guardarán las notas (.md)
+                        Text(
+                            text = "Carpeta donde se guardarán las notas (.md):",
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimaryDark
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Opción: Documentos
                         Surface(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { storageOption = "DOCUMENTS" },
                             shape = RoundedCornerShape(12.dp),
-                            color = CanvasBgWarm,
-                            border = BorderStroke(1.dp, BorderSubtleWarm)
+                            color = if (storageOption == "DOCUMENTS") CanvasBgWarm else Color.Transparent,
+                            border = BorderStroke(
+                                1.dp,
+                                if (storageOption == "DOCUMENTS") TextPrimaryDark else BorderSubtleWarm
+                            )
                         ) {
                             Row(
                                 modifier = Modifier.padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Lock,
-                                    contentDescription = null,
-                                    tint = TextPrimaryDark,
-                                    modifier = Modifier.size(20.dp)
+                                RadioButton(
+                                    selected = storageOption == "DOCUMENTS",
+                                    onClick = { storageOption = "DOCUMENTS" },
+                                    colors = RadioButtonDefaults.colors(selectedColor = TextPrimaryDark)
                                 )
-                                Spacer(modifier = Modifier.width(10.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "Almacenamiento Interno Seguro",
+                                        text = "Carpeta Documentos",
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                         color = TextPrimaryDark
                                     )
                                     Text(
-                                        text = "Bóveda privada aislada dentro de la app (Máxima protección)",
+                                        text = "Guarda las notas en Documentos/LogitNotes con subcarpetas y .md",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextSecondaryMuted
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Opción: Descargas
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { storageOption = "DOWNLOADS" },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (storageOption == "DOWNLOADS") CanvasBgWarm else Color.Transparent,
+                            border = BorderStroke(
+                                1.dp,
+                                if (storageOption == "DOWNLOADS") TextPrimaryDark else BorderSubtleWarm
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = storageOption == "DOWNLOADS",
+                                    onClick = { storageOption = "DOWNLOADS" },
+                                    colors = RadioButtonDefaults.colors(selectedColor = TextPrimaryDark)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Carpeta Descargas",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = TextPrimaryDark
+                                    )
+                                    Text(
+                                        text = "Guarda las notas en Download/LogitNotes",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextSecondaryMuted
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Opción: Ruta Personalizada
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { storageOption = "CUSTOM" },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (storageOption == "CUSTOM") CanvasBgWarm else Color.Transparent,
+                            border = BorderStroke(
+                                1.dp,
+                                if (storageOption == "CUSTOM") TextPrimaryDark else BorderSubtleWarm
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = storageOption == "CUSTOM",
+                                    onClick = { storageOption = "CUSTOM" },
+                                    colors = RadioButtonDefaults.colors(selectedColor = TextPrimaryDark)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Ruta Personalizada",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = TextPrimaryDark
+                                    )
+                                    Text(
+                                        text = "Escribe cualquier ruta específica de tu dispositivo",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextSecondaryMuted
+                                    )
+                                }
+                            }
+                        }
+
+                        if (storageOption == "CUSTOM") {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = customPathInput,
+                                onValueChange = { customPathInput = it },
+                                label = { Text("Ruta completa de la carpeta", color = TextSecondaryMuted) },
+                                placeholder = { Text("/storage/emulated/0/MisNotas") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = TextPrimaryDark,
+                                    unfocusedBorderColor = BorderSubtleWarm
+                                )
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Opción: Almacenamiento Interno
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { storageOption = "SANDBOX" },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (storageOption == "SANDBOX") CanvasBgWarm else Color.Transparent,
+                            border = BorderStroke(
+                                1.dp,
+                                if (storageOption == "SANDBOX") TextPrimaryDark else BorderSubtleWarm
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = storageOption == "SANDBOX",
+                                    onClick = { storageOption = "SANDBOX" },
+                                    colors = RadioButtonDefaults.colors(selectedColor = TextPrimaryDark)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Almacenamiento Interno Protegido",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = TextPrimaryDark
+                                    )
+                                    Text(
+                                        text = "Aislado dentro de la aplicación para máxima privacidad",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = TextSecondaryMuted
                                     )
@@ -534,7 +690,8 @@ fun LockScreen(
                                         name = name,
                                         password = password,
                                         enableBiometric = enableBiometrics,
-                                        storageType = "SANDBOX"
+                                        storageType = storageOption,
+                                        customStoragePath = if (storageOption == "CUSTOM") customPathInput.ifBlank { null } else null
                                     )
                                 }
                             },

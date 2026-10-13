@@ -39,12 +39,17 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
+import kotlinx.coroutines.delay
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -58,6 +63,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -99,11 +105,73 @@ fun NoteDetailScreen(
     val isPreviewMode by viewModel.isPreviewMode.collectAsState()
     val attachments by viewModel.noteAttachments.collectAsState()
 
+    val isSaving by viewModel.isSaving.collectAsState()
+    val lastSavedTime by viewModel.lastSavedTime.collectAsState()
+
+    var textFieldValue by remember { mutableStateOf(TextFieldValue(content, TextRange(content.length))) }
+
+    // Keep textFieldValue updated when note content changes externally
+    LaunchedEffect(content) {
+        if (content != textFieldValue.text) {
+            val cursor = textFieldValue.selection.start.coerceIn(0, content.length)
+            textFieldValue = TextFieldValue(content, TextRange(cursor))
+        }
+    }
+
+    // Debounced automatic save (600ms)
+    LaunchedEffect(title, content) {
+        if (title.isNotBlank() || content.isNotBlank()) {
+            delay(600)
+            viewModel.saveCurrentNote()
+        }
+    }
+
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showAddTagDialog by remember { mutableStateOf(false) }
     var newTagInput by remember { mutableStateOf("") }
     var showFolderDialog by remember { mutableStateOf(false) }
     var newFolderInput by remember { mutableStateOf(folder) }
+
+    fun applyFormatting(prefix: String, suffix: String) {
+        val text = textFieldValue.text
+        val selection = textFieldValue.selection
+        if (!selection.collapsed) {
+            val start = minOf(selection.start, selection.end)
+            val end = maxOf(selection.start, selection.end)
+            val selected = text.substring(start, end)
+            val newText = text.substring(0, start) + prefix + selected + suffix + text.substring(end)
+            val newSelection = TextRange(start + prefix.length, end + prefix.length)
+            textFieldValue = TextFieldValue(newText, newSelection)
+            viewModel.updateNoteContent(newText)
+        } else {
+            val cursor = selection.start
+            val pLen = prefix.length
+            val sLen = suffix.length
+            val isInside = cursor >= pLen && cursor + sLen <= text.length &&
+                    text.substring(cursor - pLen, cursor) == prefix &&
+                    text.substring(cursor, cursor + sLen) == suffix
+
+            if (isInside) {
+                // If user tapped again while inside formatting tag (e.g. **|**), jump outside!
+                textFieldValue = TextFieldValue(text, TextRange(cursor + sLen))
+            } else {
+                val newText = text.substring(0, cursor) + prefix + suffix + text.substring(cursor)
+                val newCursor = cursor + pLen
+                textFieldValue = TextFieldValue(newText, TextRange(newCursor))
+                viewModel.updateNoteContent(newText)
+            }
+        }
+    }
+
+    fun applyLinePrefix(linePrefix: String) {
+        val text = textFieldValue.text
+        val cursor = textFieldValue.selection.start
+        val lineStart = text.lastIndexOf('\n', (cursor - 1).coerceAtLeast(0)).let { if (it == -1) 0 else it + 1 }
+        val newText = text.substring(0, lineStart) + linePrefix + text.substring(lineStart)
+        val newCursor = cursor + linePrefix.length
+        textFieldValue = TextFieldValue(newText, TextRange(newCursor))
+        viewModel.updateNoteContent(newText)
+    }
 
     // Android Photo Picker for zero-permission image attachments
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -160,6 +228,39 @@ fun NoteDetailScreen(
                                         fontWeight = FontWeight.SemiBold,
                                         color = EmeraldLight
                                     )
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        if (isSaving) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(10.dp),
+                                    strokeWidth = 1.5.dp,
+                                    color = com.example.ui.theme.FolderAmber
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Guardando...",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                    color = com.example.ui.theme.TextSecondaryMuted
+                                )
+                            }
+                        } else if (lastSavedTime != null) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = com.example.ui.theme.EmeraldSecurity,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(2.dp))
+                                Text(
+                                    text = "Guardado",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                                    color = com.example.ui.theme.EmeraldSecurity
                                 )
                             }
                         }
@@ -401,11 +502,8 @@ fun NoteDetailScreen(
             // Markdown Formatting Toolbar (Shown only in Edit Mode)
             if (!isPreviewMode) {
                 MarkdownToolbar(
-                    onInsert = { prefix, suffix ->
-                        val currentText = content
-                        val newContent = "$currentText$prefix$suffix"
-                        viewModel.updateNoteContent(newContent)
-                    }
+                    onFormatInline = { prefix, suffix -> applyFormatting(prefix, suffix) },
+                    onFormatLine = { linePrefix -> applyLinePrefix(linePrefix) }
                 )
             }
 
@@ -447,8 +545,11 @@ fun NoteDetailScreen(
                             .verticalScroll(rememberScrollState())
                     ) {
                         BasicTextField(
-                            value = content,
-                            onValueChange = { viewModel.updateNoteContent(it) },
+                            value = textFieldValue,
+                            onValueChange = {
+                                textFieldValue = it
+                                viewModel.updateNoteContent(it.text)
+                            },
                             textStyle = TextStyle(
                                 fontFamily = FontFamily.Default,
                                 fontSize = 16.sp,
@@ -595,31 +696,37 @@ fun NoteDetailScreen(
 
 @Composable
 private fun MarkdownToolbar(
-    onInsert: (prefix: String, suffix: String) -> Unit
+    onFormatInline: (prefix: String, suffix: String) -> Unit,
+    onFormatLine: (linePrefix: String) -> Unit
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        shape = RoundedCornerShape(8.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            ToolbarButton(label = "H1", onClick = { onInsert("\n# ", "") })
-            ToolbarButton(label = "H2", onClick = { onInsert("\n## ", "") })
-            ToolbarButton(label = "B", bold = true, onClick = { onInsert("**", "**") })
-            ToolbarButton(label = "I", italic = true, onClick = { onInsert("*", "*") })
-            ToolbarButton(label = "[ ]", onClick = { onInsert("\n- [ ] ", "") })
-            ToolbarButton(label = "•", onClick = { onInsert("\n- ", "") })
-            ToolbarButton(label = "1.", onClick = { onInsert("\n1. ", "") })
-            ToolbarButton(label = ">", onClick = { onInsert("\n> ", "") })
-            ToolbarButton(label = "```", onClick = { onInsert("\n```\n", "\n```\n") })
-            ToolbarButton(label = "---", onClick = { onInsert("\n---\n", "") })
+            ToolbarButton(label = "B", bold = true, onClick = { onFormatInline("**", "**") })
+            ToolbarButton(label = "I", italic = true, onClick = { onFormatInline("*", "*") })
+            ToolbarButton(label = "H1", onClick = { onFormatLine("# ") })
+            ToolbarButton(label = "H2", onClick = { onFormatLine("## ") })
+            ToolbarButton(label = "H3", onClick = { onFormatLine("### ") })
+            ToolbarButton(label = "[ ]", onClick = { onFormatLine("- [ ] ") })
+            ToolbarButton(label = "•", onClick = { onFormatLine("- ") })
+            ToolbarButton(label = "1.", onClick = { onFormatLine("1. ") })
+            ToolbarButton(label = "`c`", onClick = { onFormatInline("`", "`") })
+            ToolbarButton(label = "```", onClick = { onFormatInline("\n```\n", "\n```\n") })
+            ToolbarButton(label = "~~", onClick = { onFormatInline("~~", "~~") })
+            ToolbarButton(label = ">", onClick = { onFormatLine("> ") })
+            ToolbarButton(label = "---", onClick = { onFormatLine("---\n") })
         }
     }
 }

@@ -69,6 +69,15 @@ import com.example.ui.theme.SurfaceCardWhite
 import com.example.ui.theme.TextPrimaryDark
 import com.example.ui.theme.TextSecondaryMuted
 
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextButton
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -78,9 +87,15 @@ fun SettingsScreen(
     val context = LocalContext.current
     val vaultStats by viewModel.vaultStats.collectAsState()
     val isExporting by viewModel.isExporting.collectAsState()
+    val isSaving by viewModel.isSaving.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
+    val vaultStoragePath by viewModel.vaultStoragePath.collectAsState()
+    val vaultStorageType by viewModel.vaultStorageType.collectAsState()
 
     var biometricEnabled by remember { mutableStateOf(viewModel.isBiometricEnabled) }
+    var showChangePathDialog by remember { mutableStateOf(false) }
+    var tempStorageOption by remember { mutableStateOf(vaultStorageType) }
+    var tempCustomPath by remember { mutableStateOf(vaultStoragePath) }
 
     // Import Markdown file launcher
     val importMarkdownLauncher = rememberLauncherForActivityResult(
@@ -207,7 +222,109 @@ fun SettingsScreen(
                 }
             }
 
-            // 2. Seguridad & Biometría
+            // 2. Carpeta y Almacenamiento de Notas (.md)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = SurfaceCardWhite,
+                border = BorderStroke(1.dp, BorderSubtleWarm)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = null,
+                            tint = TextPrimaryDark,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Carpeta de Notas (.md)",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimaryDark
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Cada nota se guarda automáticamente como un archivo .md estándar dentro de esta carpeta, organizada en subcarpetas:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondaryMuted
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = CanvasBgWarm,
+                        border = BorderStroke(1.dp, BorderSubtleWarm)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "Ruta activa:",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = TextSecondaryMuted
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = vaultStoragePath,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 12.sp
+                                ),
+                                color = TextPrimaryDark
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                tempStorageOption = vaultStorageType
+                                tempCustomPath = vaultStoragePath
+                                showChangePathDialog = true
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, BorderSubtleWarm)
+                        ) {
+                            Text("Cambiar Carpeta", color = TextPrimaryDark)
+                        }
+
+                        Button(
+                            onClick = { viewModel.syncAllNotesToMarkdown() },
+                            enabled = !isSaving,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = TextPrimaryDark,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            if (isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color.White
+                                )
+                            } else {
+                                Text("Sincronizar .md", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Seguridad & Biometría
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -417,6 +534,117 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
         }
+    }
+
+    if (showChangePathDialog) {
+        AlertDialog(
+            onDismissRequest = { showChangePathDialog = false },
+            title = {
+                Text(
+                    text = "Seleccionar Carpeta de Notas",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Elige la ubicación donde se crearán los archivos .md:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondaryMuted
+                    )
+
+                    // Documentos
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { tempStorageOption = "DOCUMENTS" }
+                    ) {
+                        RadioButton(
+                            selected = tempStorageOption == "DOCUMENTS",
+                            onClick = { tempStorageOption = "DOCUMENTS" }
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Documentos (Documents/LogitNotes)")
+                    }
+
+                    // Descargas
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { tempStorageOption = "DOWNLOADS" }
+                    ) {
+                        RadioButton(
+                            selected = tempStorageOption == "DOWNLOADS",
+                            onClick = { tempStorageOption = "DOWNLOADS" }
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Descargas (Download/LogitNotes)")
+                    }
+
+                    // Personalizada
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { tempStorageOption = "CUSTOM" }
+                    ) {
+                        RadioButton(
+                            selected = tempStorageOption == "CUSTOM",
+                            onClick = { tempStorageOption = "CUSTOM" }
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Ruta Personalizada")
+                    }
+
+                    if (tempStorageOption == "CUSTOM") {
+                        OutlinedTextField(
+                            value = tempCustomPath,
+                            onValueChange = { tempCustomPath = it },
+                            label = { Text("Ruta completa de la carpeta") },
+                            placeholder = { Text("/storage/emulated/0/MisNotas") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+
+                    // Interno
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { tempStorageOption = "SANDBOX" }
+                    ) {
+                        RadioButton(
+                            selected = tempStorageOption == "SANDBOX",
+                            onClick = { tempStorageOption = "SANDBOX" }
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Almacenamiento Interno Protegido")
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.setVaultStorageLocation(
+                            tempStorageOption,
+                            if (tempStorageOption == "CUSTOM") tempCustomPath else null
+                        )
+                        showChangePathDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = TextPrimaryDark)
+                ) {
+                    Text("Guardar y Mover")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showChangePathDialog = false }) {
+                    Text("Cancelar", color = TextSecondaryMuted)
+                }
+            }
+        )
     }
 }
 

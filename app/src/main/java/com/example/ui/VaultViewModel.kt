@@ -138,6 +138,18 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     private val _vaultStats = MutableStateFlow(VaultStats())
     val vaultStats: StateFlow<VaultStats> = _vaultStats.asStateFlow()
 
+    private val _vaultStoragePath = MutableStateFlow(fileManager.getVaultStoragePath())
+    val vaultStoragePath: StateFlow<String> = _vaultStoragePath.asStateFlow()
+
+    private val _vaultStorageType = MutableStateFlow(fileManager.getVaultLocationType())
+    val vaultStorageType: StateFlow<String> = _vaultStorageType.asStateFlow()
+
+    private val _isSaving = MutableStateFlow(false)
+    val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
+    private val _lastSavedTime = MutableStateFlow<Long?>(null)
+    val lastSavedTime: StateFlow<Long?> = _lastSavedTime.asStateFlow()
+
     private val _isExporting = MutableStateFlow(false)
     val isExporting: StateFlow<Boolean> = _isExporting.asStateFlow()
 
@@ -153,7 +165,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         name: String,
         password: String,
         enableBiometric: Boolean,
-        storageType: String = "SANDBOX",
+        storageType: String = "DOCUMENTS",
         customStoragePath: String? = null
     ) {
         if (password.length < 4) {
@@ -162,6 +174,8 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
         val cleanName = name.trim().ifBlank { "Mi Bóveda" }
         fileManager.setVaultLocation(storageType, customStoragePath)
+        _vaultStoragePath.value = fileManager.getVaultStoragePath()
+        _vaultStorageType.value = fileManager.getVaultLocationType()
         val success = cryptoManager.setupVault(cleanName, password, enableBiometric)
         if (success) {
             _vaultOwnerName.value = cleanName
@@ -312,6 +326,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         val content = _noteContent.value
 
         viewModelScope.launch {
+            _isSaving.value = true
             val savedId = repository.saveNote(
                 id = _editingNoteId.value,
                 title = title,
@@ -321,7 +336,31 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
                 isPinned = _noteIsPinned.value
             )
             _editingNoteId.value = savedId
+            _lastSavedTime.value = System.currentTimeMillis()
+            _isSaving.value = false
             refreshVaultStats()
+        }
+    }
+
+    fun setVaultStorageLocation(type: String, customPath: String? = null) {
+        fileManager.setVaultLocation(type, customPath)
+        _vaultStoragePath.value = fileManager.getVaultStoragePath()
+        _vaultStorageType.value = fileManager.getVaultLocationType()
+        viewModelScope.launch {
+            _isSaving.value = true
+            repository.syncAllNotesToMarkdown()
+            _isSaving.value = false
+            refreshVaultStats()
+            _statusMessage.value = "Carpeta actualizada: ${_vaultStoragePath.value}"
+        }
+    }
+
+    fun syncAllNotesToMarkdown() {
+        viewModelScope.launch {
+            _isSaving.value = true
+            repository.syncAllNotesToMarkdown()
+            _isSaving.value = false
+            _statusMessage.value = "Notas sincronizadas en formato .md"
         }
     }
 

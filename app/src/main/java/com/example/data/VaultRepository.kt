@@ -128,7 +128,18 @@ class VaultRepository(
 
         dao.insertOrUpdateNote(entity)
 
-        // Save local file in encrypted vault format (.vault ciphertext file)
+        // Save note directly as Markdown (.md) in the selected vault directory
+        fileManager.writeNoteMarkdownFile(
+            id = noteId,
+            title = title,
+            content = content,
+            folder = entity.folder,
+            tags = tags,
+            createdAt = entity.createdAt,
+            updatedAt = entity.updatedAt
+        )
+
+        // Save local backup file in encrypted vault format (.vault ciphertext file)
         fileManager.writeEncryptedNoteFile(noteId, entity.folder, "$encTitle\n$encContent")
 
         noteId
@@ -142,10 +153,29 @@ class VaultRepository(
     suspend fun deleteNote(noteId: String) = withContext(Dispatchers.IO) {
         val entity = dao.getNoteById(noteId)
         if (entity != null) {
+            fileManager.deleteNoteMarkdownFile(noteId)
             fileManager.deleteEncryptedNoteFile(noteId, entity.folder)
         }
         dao.deleteNoteById(noteId)
         dao.deleteAllAttachmentsForNote(noteId)
+    }
+
+    suspend fun syncAllNotesToMarkdown() = withContext(Dispatchers.IO) {
+        val allEntities = dao.getAllNotesSnapshot()
+        for (entity in allEntities) {
+            val title = try { cryptoManager.decryptString(entity.encryptedTitle) } catch (e: Exception) { "Nota" }
+            val content = try { cryptoManager.decryptString(entity.encryptedContent) } catch (e: Exception) { "" }
+            val tags = if (entity.tagsCsv.isNotBlank()) entity.tagsCsv.split(",") else emptyList()
+            fileManager.writeNoteMarkdownFile(
+                id = entity.id,
+                title = title,
+                content = content,
+                folder = entity.folder,
+                tags = tags,
+                createdAt = entity.createdAt,
+                updatedAt = entity.updatedAt
+            )
+        }
     }
 
     // Attachments
