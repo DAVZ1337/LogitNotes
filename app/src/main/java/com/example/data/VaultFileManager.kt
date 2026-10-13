@@ -33,23 +33,16 @@ class VaultFileManager(
     }
 
     fun setVaultLocation(type: String, customPath: String? = null) {
-        val targetPath = when (type) {
-            "DOCUMENTS" -> {
-                val docDir = File(context.getExternalFilesDir(null) ?: context.filesDir, "ObsidianVault").apply { if (!exists()) mkdirs() }
-                docDir.absolutePath
-            }
-            "CUSTOM" -> customPath ?: File(context.filesDir, "obsidian_vault").absolutePath
-            else -> File(context.filesDir, "obsidian_vault").apply { if (!exists()) mkdirs() }.absolutePath
-        }
+        val targetPath = File(context.filesDir, "logit_vault").apply { if (!exists()) mkdirs() }.absolutePath
         prefs.edit()
-            .putString("vault_storage_type", type)
+            .putString("vault_storage_type", "SANDBOX")
             .putString("vault_storage_path", targetPath)
             .apply()
     }
 
     val vaultDir: File
-        get() = File(prefs.getString("vault_storage_path", File(context.filesDir, "obsidian_vault").absolutePath)
-            ?: File(context.filesDir, "obsidian_vault").absolutePath).apply {
+        get() = File(prefs.getString("vault_storage_path", File(context.filesDir, "logit_vault").absolutePath)
+            ?: File(context.filesDir, "logit_vault").absolutePath).apply {
             if (!exists()) mkdirs()
         }
 
@@ -162,7 +155,7 @@ class VaultFileManager(
     }
 
     /**
-     * Exports a single note as a standard plaintext Markdown (.md) file with Obsidian metadata
+     * Exports a single note as a standard plaintext Markdown (.md) file with metadata
      */
     fun exportNoteAsMarkdownFile(note: Note): File {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
@@ -194,10 +187,10 @@ class VaultFileManager(
     }
 
     /**
-     * Exports the entire Vault as an Obsidian-ready ZIP bundle
+     * Exports the entire Vault as a ZIP bundle
      */
     fun exportEntireVaultAsZip(notes: List<Note>, attachments: List<NoteAttachment>): File {
-        val zipFile = File(exportDir, "VaultNotes_Export_${System.currentTimeMillis()}.zip")
+        val zipFile = File(exportDir, "LogitNotes_Vault_${System.currentTimeMillis()}.zip")
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
 
         ZipOutputStream(FileOutputStream(zipFile)).use { zos ->

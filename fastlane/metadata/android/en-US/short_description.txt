@@ -1,0 +1,1 @@
+100% private offline notes vault with AES-256 local encryption, biometrics & Markdown.

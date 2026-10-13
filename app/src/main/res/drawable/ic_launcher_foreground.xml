@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/logitnotes_minimal_icon_1791833800543"
+        android:drawable="@drawable/eco_minimal_gem_icon_1791895721804"
         android:gravity="center" />
 </layer-list>

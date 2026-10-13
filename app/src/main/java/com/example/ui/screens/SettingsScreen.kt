@@ -287,7 +287,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 3. Exportar & Importar Markdown (Estilo Obsidian)
+            // 3. Exportar & Importar Markdown
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
@@ -315,7 +315,7 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "Exporta tus notas en archivos estándar .md organizados en carpetas con adjuntos, 100% compatibles con Obsidian.",
+                        text = "Exporta tus notas en archivos estándar .md organizados en carpetas con adjuntos, 100% interoperables y portables.",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondaryMuted
                     )

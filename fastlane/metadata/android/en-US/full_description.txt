@@ -1,0 +1,10 @@
+LogitNotes is an open-source, offline-first secure personal notes vault.
+
+Key Features:
+- 100% Local Storage: Your notes stay on your device. Zero cloud dependency, zero trackers.
+- Military-Grade Encryption: AES-256-GCM encryption with PBKDF2 key derivation (100,000 iterations).
+- Native Biometrics: Fingerprint and facial recognition unlock using Android BiometricPrompt.
+- Standard Markdown: Full Markdown (.md) support with task lists, headings, and formatting.
+- Encrypted Attachments: Secure local storage for pictures and documents.
+- Export & Backup: Export single notes as plain .md or export the entire vault as a .zip bundle.
+- User-Defined Master Key: No default passwords. Every user sets their unique passphrase.

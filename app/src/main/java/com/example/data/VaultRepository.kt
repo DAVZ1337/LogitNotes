@@ -128,7 +128,7 @@ class VaultRepository(
 
         dao.insertOrUpdateNote(entity)
 
-        // Save local file in obsidian vault format (.vault ciphertext file)
+        // Save local file in encrypted vault format (.vault ciphertext file)
         fileManager.writeEncryptedNoteFile(noteId, entity.folder, "$encTitle\n$encContent")
 
         noteId

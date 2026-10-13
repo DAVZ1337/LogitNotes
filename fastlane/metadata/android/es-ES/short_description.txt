@@ -1,0 +1,1 @@
+Bóveda de notas 100% privada con cifrado AES-256 local, biometría y Markdown.

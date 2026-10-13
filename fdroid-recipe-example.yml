@@ -1,0 +1,40 @@
+# Plantilla de receta para F-Droid (fdroiddata/metadata/com.aistudio.vaultnotes.zqmvx.yml)
+# Puedes usar este archivo al enviar tu solicitud a F-Droid (GitLab fdroiddata)
+
+Categories:
+  - Security
+  - Writing
+License: Apache-2.0
+WebSite: https://github.com/REEMPLAZAR_USUARIO/REEMPLAZAR_REPO
+SourceCode: https://github.com/REEMPLAZAR_USUARIO/REEMPLAZAR_REPO
+IssueTracker: https://github.com/REEMPLAZAR_USUARIO/REEMPLAZAR_REPO/issues
+
+AutoName: LogitNotes
+Summary: Bóveda de notas 100% local y cifrada con biometría y Markdown
+Description: |-
+  LogitNotes es una aplicación de notas y bóveda personal completamente privada,
+  de código abierto (FLOSS) y fuera de línea (offline-first).
+
+  Características:
+  - Almacenamiento 100% local en tu dispositivo, sin servidores ni rastreadores.
+  - Cifrado de grado militar AES-256-GCM y derivación PBKDF2 (100.000 iteraciones).
+  - Autenticación biométrica nativa (huella dactilar y reconocimiento facial).
+  - Editor y visor de notas en Markdown estándar (.md).
+  - Soporte para adjuntar imágenes y documentos cifrados.
+  - Copias de seguridad y exportación en Markdown o archivo ZIP completo.
+  - Sin contraseñas por defecto: cada usuario define su propia clave maestra.
+
+RepoType: git
+Repo: https://github.com/REEMPLAZAR_USUARIO/REEMPLAZAR_REPO.git
+
+Builds:
+  - versionName: '1.0'
+    versionCode: 1
+    commit: main
+    gradle:
+      - assembleRelease
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: '1.0'
+CurrentVersionCode: 1

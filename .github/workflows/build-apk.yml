@@ -1,17 +1,20 @@
-name: Build Debug APK
+name: Build Android APK
 
 on:
   push:
     branches:
       - main
+      - master
+  pull_request:
   workflow_dispatch:
 
 jobs:
   build:
+    name: Build APK
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -20,7 +23,7 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK and required components
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           api-level: 36
@@ -29,27 +32,26 @@ jobs:
             platform-tools
             cmdline-tools;latest
 
-      - name: Fallback: ensure cmdline-tools and accept licenses
+      - name: Accept Android SDK licenses
         run: |
-          export ANDROID_SDK_ROOT=${{ env.ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk }}
-          for i in 1 2 3; do
-            if [ -x "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" ] || [ -x "$ANDROID_SDK_ROOT/cmdline-tools/16.0/bin/sdkmanager" ]; then
-              echo "sdkmanager found"
-              break
-            fi
-            echo "Attempting to install cmdline-tools (attempt $i)"
-            sdkmanager "cmdline-tools;latest" && break || sleep 3
-          done
           yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools" || true
 
-      - name: Build debug APK
+      - name: Prepare build environment (keystore and env files)
         run: |
-          chmod +x ./gradlew || true
-          ./gradlew assembleDebug --no-daemon
+          touch .env
+          if [ ! -f debug.keystore ]; then
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          chmod +x ./gradlew
 
-      - name: Upload debug APK
+      - name: Build Debug APK
+        run: |
+          ./gradlew assembleDebug --stacktrace --no-daemon
+
+      - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
+          name: LogitNotes-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+          if-no-files-found: error

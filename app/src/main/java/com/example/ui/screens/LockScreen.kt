@@ -133,7 +133,7 @@ fun LockScreen(
                 shadowElevation = 2.dp
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.logitnotes_minimal_icon_1791833800543),
+                    painter = painterResource(id = R.drawable.eco_minimal_gem_icon_1791895721804),
                     contentDescription = "LogitNotes Logo",
                     modifier = Modifier.fillMaxSize()
                 )
