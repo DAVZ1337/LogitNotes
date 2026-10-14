@@ -94,8 +94,17 @@ fun SettingsScreen(
 
     var biometricEnabled by remember { mutableStateOf(viewModel.isBiometricEnabled) }
     var showChangePathDialog by remember { mutableStateOf(false) }
-    var tempStorageOption by remember { mutableStateOf(vaultStorageType) }
-    var tempCustomPath by remember { mutableStateOf(vaultStoragePath) }
+
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val doc = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, uri)
+            val friendlyName = doc?.name ?: "Carpeta elegida"
+            viewModel.setVaultTreeUri(uri, friendlyName)
+            showChangePathDialog = false
+        }
+    }
 
     // Import Markdown file launcher
     val importMarkdownLauncher = rememberLauncherForActivityResult(
@@ -289,8 +298,6 @@ fun SettingsScreen(
                     ) {
                         OutlinedButton(
                             onClick = {
-                                tempStorageOption = vaultStorageType
-                                tempCustomPath = vaultStoragePath
                                 showChangePathDialog = true
                             },
                             modifier = Modifier.weight(1f),
@@ -546,26 +553,48 @@ fun SettingsScreen(
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "Elige la ubicación donde se crearán los archivos .md:",
+                        text = "Selecciona cómo deseas guardar los archivos .md:",
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondaryMuted
                     )
+
+                    // Botón directo para abrir el Explorador de Archivos
+                    Button(
+                        onClick = { folderPickerLauncher.launch(null) },
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = TextPrimaryDark)
+                    ) {
+                        Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Abrir Explorador de Archivos", fontWeight = FontWeight.Bold)
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
                     // Documentos
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { tempStorageOption = "DOCUMENTS" }
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                viewModel.setVaultStorageLocation("DOCUMENTS")
+                                showChangePathDialog = false
+                            }
+                            .padding(vertical = 6.dp)
                     ) {
                         RadioButton(
-                            selected = tempStorageOption == "DOCUMENTS",
-                            onClick = { tempStorageOption = "DOCUMENTS" }
+                            selected = vaultStorageType == "DOCUMENTS",
+                            onClick = {
+                                viewModel.setVaultStorageLocation("DOCUMENTS")
+                                showChangePathDialog = false
+                            }
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Documentos (Documents/LogitNotes)")
+                        Text("Carpeta Documentos (Documents/LogitNotes)")
                     }
 
                     // Descargas
@@ -573,40 +602,22 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { tempStorageOption = "DOWNLOADS" }
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                viewModel.setVaultStorageLocation("DOWNLOADS")
+                                showChangePathDialog = false
+                            }
+                            .padding(vertical = 6.dp)
                     ) {
                         RadioButton(
-                            selected = tempStorageOption == "DOWNLOADS",
-                            onClick = { tempStorageOption = "DOWNLOADS" }
+                            selected = vaultStorageType == "DOWNLOADS",
+                            onClick = {
+                                viewModel.setVaultStorageLocation("DOWNLOADS")
+                                showChangePathDialog = false
+                            }
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Descargas (Download/LogitNotes)")
-                    }
-
-                    // Personalizada
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { tempStorageOption = "CUSTOM" }
-                    ) {
-                        RadioButton(
-                            selected = tempStorageOption == "CUSTOM",
-                            onClick = { tempStorageOption = "CUSTOM" }
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Ruta Personalizada")
-                    }
-
-                    if (tempStorageOption == "CUSTOM") {
-                        OutlinedTextField(
-                            value = tempCustomPath,
-                            onValueChange = { tempCustomPath = it },
-                            label = { Text("Ruta completa de la carpeta") },
-                            placeholder = { Text("/storage/emulated/0/MisNotas") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
+                        Text("Carpeta Descargas (Download/LogitNotes)")
                     }
 
                     // Interno
@@ -614,34 +625,29 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { tempStorageOption = "SANDBOX" }
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable {
+                                viewModel.setVaultStorageLocation("SANDBOX")
+                                showChangePathDialog = false
+                            }
+                            .padding(vertical = 6.dp)
                     ) {
                         RadioButton(
-                            selected = tempStorageOption == "SANDBOX",
-                            onClick = { tempStorageOption = "SANDBOX" }
+                            selected = vaultStorageType == "SANDBOX",
+                            onClick = {
+                                viewModel.setVaultStorageLocation("SANDBOX")
+                                showChangePathDialog = false
+                            }
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Almacenamiento Interno Protegido")
                     }
                 }
             },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        viewModel.setVaultStorageLocation(
-                            tempStorageOption,
-                            if (tempStorageOption == "CUSTOM") tempCustomPath else null
-                        )
-                        showChangePathDialog = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = TextPrimaryDark)
-                ) {
-                    Text("Guardar y Mover")
-                }
-            },
+            confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showChangePathDialog = false }) {
-                    Text("Cancelar", color = TextSecondaryMuted)
+                    Text("Cerrar", color = TextSecondaryMuted)
                 }
             }
         )

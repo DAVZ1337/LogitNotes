@@ -166,14 +166,19 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         password: String,
         enableBiometric: Boolean,
         storageType: String = "DOCUMENTS",
-        customStoragePath: String? = null
+        customStoragePath: String? = null,
+        treeUri: Uri? = null
     ) {
         if (password.length < 4) {
             _unlockError.value = "La contraseña maestra debe tener al menos 4 caracteres"
             return
         }
         val cleanName = name.trim().ifBlank { "Mi Bóveda" }
-        fileManager.setVaultLocation(storageType, customStoragePath)
+        if (treeUri != null) {
+            fileManager.setVaultTreeUri(treeUri)
+        } else {
+            fileManager.setVaultLocation(storageType, customStoragePath)
+        }
         _vaultStoragePath.value = fileManager.getVaultStoragePath()
         _vaultStorageType.value = fileManager.getVaultLocationType()
         val success = cryptoManager.setupVault(cleanName, password, enableBiometric)
@@ -182,10 +187,22 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
             _isVaultInitialized.value = true
             _isUnlocked.value = true
             _unlockError.value = null
-            // Completely clean vault with 0 default notes as requested
             refreshVaultStats()
         } else {
             _unlockError.value = "Error al inicializar la bóveda"
+        }
+    }
+
+    fun setVaultTreeUri(uri: Uri, friendlyName: String? = null) {
+        fileManager.setVaultTreeUri(uri, friendlyName)
+        _vaultStoragePath.value = fileManager.getVaultStoragePath()
+        _vaultStorageType.value = fileManager.getVaultLocationType()
+        viewModelScope.launch {
+            _isSaving.value = true
+            repository.syncAllNotesToMarkdown()
+            _isSaving.value = false
+            refreshVaultStats()
+            _statusMessage.value = "Carpeta configurada: ${_vaultStoragePath.value}"
         }
     }
 

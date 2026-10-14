@@ -1,5 +1,12 @@
 package com.example.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
+import androidx.documentfile.provider.DocumentFile
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -74,6 +81,7 @@ import androidx.compose.ui.res.painterResource
 import com.example.R
 import com.example.ui.theme.BorderSubtleWarm
 import com.example.ui.theme.CanvasBgWarm
+import com.example.ui.theme.EmeraldSecurity
 import com.example.ui.theme.FolderAmber
 import com.example.ui.theme.RoseError
 import com.example.ui.theme.SurfaceCardWhite
@@ -89,13 +97,26 @@ fun LockScreen(
     val unlockError by viewModel.unlockError.collectAsState()
     val vaultOwnerName by viewModel.vaultOwnerName.collectAsState()
 
+    val context = LocalContext.current
     var vaultNameInput by remember { mutableStateOf("") }
-    var storageOption by remember { mutableStateOf("DOCUMENTS") }
-    var customPathInput by remember { mutableStateOf("") }
+    var storageOption by remember { mutableStateOf("SAF_TREE") }
+    var customTreeUri by remember { mutableStateOf<Uri?>(null) }
+    var customFolderName by remember { mutableStateOf<String?>(null) }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var enableBiometrics by remember { mutableStateOf(viewModel.isBiometricAvailable) }
     var isPasswordVisible by remember { mutableStateOf(false) }
+
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            customTreeUri = uri
+            storageOption = "SAF_TREE"
+            val doc = DocumentFile.fromTreeUri(context, uri)
+            customFolderName = doc?.name ?: "Carpeta elegida"
+        }
+    }
 
     // Auto-prompt biometrics if initialized and enabled
     LaunchedEffect(isInitialized, viewModel.isBiometricEnabled) {
@@ -351,7 +372,86 @@ fun LockScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Opción: Documentos
+                        // Opción 1: Elegir con el Explorador de Archivos
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    storageOption = "SAF_TREE"
+                                    folderPickerLauncher.launch(null)
+                                },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (storageOption == "SAF_TREE") CanvasBgWarm else Color.Transparent,
+                            border = BorderStroke(
+                                1.5.dp,
+                                if (storageOption == "SAF_TREE") TextPrimaryDark else BorderSubtleWarm
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    RadioButton(
+                                        selected = storageOption == "SAF_TREE",
+                                        onClick = {
+                                            storageOption = "SAF_TREE"
+                                            if (customTreeUri == null) folderPickerLauncher.launch(null)
+                                        },
+                                        colors = RadioButtonDefaults.colors(selectedColor = TextPrimaryDark)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Elegir con Explorador de Archivos",
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = TextPrimaryDark
+                                        )
+                                        Text(
+                                            text = if (customFolderName != null)
+                                                "✓ Carpeta: $customFolderName"
+                                            else
+                                                "Abre el gestor de archivos para elegir cualquier carpeta",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                color = if (customFolderName != null) EmeraldSecurity else TextSecondaryMuted,
+                                                fontWeight = if (customFolderName != null) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Button(
+                                    onClick = {
+                                        storageOption = "SAF_TREE"
+                                        folderPickerLauncher.launch(null)
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(40.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (customFolderName != null) CanvasBgWarm else TextPrimaryDark,
+                                        contentColor = if (customFolderName != null) TextPrimaryDark else Color.White
+                                    ),
+                                    border = if (customFolderName != null) BorderStroke(1.dp, BorderSubtleWarm) else null
+                                ) {
+                                    Icon(
+                                        imageVector = if (customFolderName != null) Icons.Default.Check else Icons.Default.FolderOpen,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (customFolderName != null) "Cambiar Carpeta Elegida" else "Abrir Explorador de Archivos",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Opción 2: Documentos Predeterminada
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -376,12 +476,12 @@ fun LockScreen(
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "Carpeta Documentos",
+                                        text = "Carpeta Documentos Predeterminada",
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                                         color = TextPrimaryDark
                                     )
                                     Text(
-                                        text = "Guarda las notas en Documentos/LogitNotes con subcarpetas y .md",
+                                        text = "Guarda directamente en Documents/LogitNotes",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = TextSecondaryMuted
                                     )
@@ -391,104 +491,7 @@ fun LockScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // Opción: Descargas
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { storageOption = "DOWNLOADS" },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (storageOption == "DOWNLOADS") CanvasBgWarm else Color.Transparent,
-                            border = BorderStroke(
-                                1.dp,
-                                if (storageOption == "DOWNLOADS") TextPrimaryDark else BorderSubtleWarm
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = storageOption == "DOWNLOADS",
-                                    onClick = { storageOption = "DOWNLOADS" },
-                                    colors = RadioButtonDefaults.colors(selectedColor = TextPrimaryDark)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        text = "Carpeta Descargas",
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = TextPrimaryDark
-                                    )
-                                    Text(
-                                        text = "Guarda las notas en Download/LogitNotes",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = TextSecondaryMuted
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Opción: Ruta Personalizada
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { storageOption = "CUSTOM" },
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (storageOption == "CUSTOM") CanvasBgWarm else Color.Transparent,
-                            border = BorderStroke(
-                                1.dp,
-                                if (storageOption == "CUSTOM") TextPrimaryDark else BorderSubtleWarm
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = storageOption == "CUSTOM",
-                                    onClick = { storageOption = "CUSTOM" },
-                                    colors = RadioButtonDefaults.colors(selectedColor = TextPrimaryDark)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column {
-                                    Text(
-                                        text = "Ruta Personalizada",
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = TextPrimaryDark
-                                    )
-                                    Text(
-                                        text = "Escribe cualquier ruta específica de tu dispositivo",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = TextSecondaryMuted
-                                    )
-                                }
-                            }
-                        }
-
-                        if (storageOption == "CUSTOM") {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value = customPathInput,
-                                onValueChange = { customPathInput = it },
-                                label = { Text("Ruta completa de la carpeta", color = TextSecondaryMuted) },
-                                placeholder = { Text("/storage/emulated/0/MisNotas") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = TextPrimaryDark,
-                                    unfocusedBorderColor = BorderSubtleWarm
-                                )
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Opción: Almacenamiento Interno
+                        // Opción 3: Almacenamiento Interno Protegido
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -691,7 +694,7 @@ fun LockScreen(
                                         password = password,
                                         enableBiometric = enableBiometrics,
                                         storageType = storageOption,
-                                        customStoragePath = if (storageOption == "CUSTOM") customPathInput.ifBlank { null } else null
+                                        treeUri = if (storageOption == "SAF_TREE") customTreeUri else null
                                     )
                                 }
                             },

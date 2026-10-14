@@ -1,8 +1,10 @@
 package com.example.data
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Environment
+import androidx.documentfile.provider.DocumentFile
 import com.example.model.Note
 import com.example.model.NoteAttachment
 import com.example.security.CryptoManager
@@ -25,7 +27,17 @@ class VaultFileManager(
         return prefs.getString("vault_storage_type", "DOCUMENTS") ?: "DOCUMENTS"
     }
 
+    fun getVaultTreeUri(): Uri? {
+        val uriStr = prefs.getString("vault_tree_uri", null) ?: return null
+        return try { Uri.parse(uriStr) } catch (_: Exception) { null }
+    }
+
     fun getVaultStoragePath(): String {
+        val type = getVaultLocationType()
+        if (type == "SAF_TREE") {
+            return prefs.getString("vault_friendly_path", null)
+                ?: prefs.getString("vault_tree_uri", "Carpeta en Explorador de Archivos")!!
+        }
         return vaultDir.absolutePath
     }
 
@@ -33,11 +45,36 @@ class VaultFileManager(
         val type = getVaultLocationType()
         val path = getVaultStoragePath()
         return when (type) {
+            "SAF_TREE" -> "Carpeta de Explorador ($path)"
             "DOCUMENTS" -> "Carpeta Documentos ($path)"
             "DOWNLOADS" -> "Carpeta Descargas ($path)"
             "CUSTOM" -> "Ruta Personalizada ($path)"
             else -> "Almacenamiento Interno Protegido ($path)"
         }
+    }
+
+    fun setVaultTreeUri(treeUri: Uri, friendlyName: String? = null) {
+        try {
+            context.contentResolver.takePersistableUriPermission(
+                treeUri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+        } catch (_: Exception) {}
+
+        val doc = DocumentFile.fromTreeUri(context, treeUri)
+        val name = friendlyName ?: doc?.name ?: "Carpeta seleccionada"
+        val friendlyPath = if (treeUri.path?.contains("primary:") == true) {
+            val sub = treeUri.path?.substringAfter("primary:")?.substringBefore("/document") ?: ""
+            "/storage/emulated/0/$sub"
+        } else {
+            "Explorador de Archivos ($name)"
+        }
+
+        prefs.edit()
+            .putString("vault_storage_type", "SAF_TREE")
+            .putString("vault_tree_uri", treeUri.toString())
+            .putString("vault_friendly_path", friendlyPath)
+            .apply()
     }
 
     fun setVaultLocation(type: String, customPath: String? = null) {
@@ -78,6 +115,7 @@ class VaultFileManager(
         prefs.edit()
             .putString("vault_storage_type", type)
             .putString("vault_storage_path", targetPath)
+            .remove("vault_tree_uri")
             .apply()
     }
 
@@ -95,7 +133,6 @@ class VaultFileManager(
             try {
                 if (!dir.exists()) dir.mkdirs()
             } catch (e: Exception) {
-                // Fallback to internal storage if permission fails
                 val fallback = File(context.filesDir, "LogitNotes").apply { if (!exists()) mkdirs() }
                 return fallback
             }
@@ -103,7 +140,7 @@ class VaultFileManager(
         }
 
     private val notesDir: File
-        get() = vaultDir // Store notes directly in vault directory organized by folders
+        get() = vaultDir
 
     private val attachmentsDir: File
         get() = File(vaultDir, ".attachments").apply {
@@ -117,7 +154,7 @@ class VaultFileManager(
 
     /**
      * Writes a human-readable Markdown (.md) file organized inside the vault folder.
-     * Subfolders are created if folder is specified and not 'General'.
+     * Supports both direct File writing and Android SAF DocumentTree URI.
      */
     fun writeNoteMarkdownFile(
         id: String,
@@ -141,9 +178,10 @@ class VaultFileManager(
             val tagsStr = if (tags.isNotEmpty()) tags.joinToString(", ", "[", "]") { "\"$it\"" } else "[]"
 
             val sanitizedTitle = sanitizeFileName(title.ifBlank { "nota_${id.take(6)}" })
-            val newFile = File(targetFolder, "$sanitizedTitle.md")
+            val fileName = "$sanitizedTitle.md"
+            val newFile = File(targetFolder, fileName)
 
-            // Remove old file if title or folder changed
+            // Remove old local file if title or folder changed
             val oldRelativePath = prefs.getString("note_md_path_$id", null)
             if (oldRelativePath != null) {
                 val oldFile = File(vaultDir, oldRelativePath)
@@ -168,11 +206,36 @@ class VaultFileManager(
                 appendLine(content)
             }
 
+            // 1. Write to local file
             newFile.writeText(markdownText, Charsets.UTF_8)
-
-            // Save new relative path
             val relativePath = newFile.relativeTo(vaultDir).path
             prefs.edit().putString("note_md_path_$id", relativePath).apply()
+
+            // 2. If user selected a custom SAF tree folder via File Explorer, sync into it as well!
+            val treeUri = getVaultTreeUri()
+            if (treeUri != null) {
+                try {
+                    val rootDoc = DocumentFile.fromTreeUri(context, treeUri)
+                    if (rootDoc != null && rootDoc.canWrite()) {
+                        val targetDir = if (folder.isNotBlank() && folder != "General") {
+                            rootDoc.findFile(sanitizeFolderName(folder))
+                                ?: rootDoc.createDirectory(sanitizeFolderName(folder))
+                                ?: rootDoc
+                        } else {
+                            rootDoc
+                        }
+                        val existingDoc = targetDir.findFile(fileName)
+                        val noteDoc = existingDoc ?: targetDir.createFile("text/markdown", fileName)
+                        if (noteDoc != null) {
+                            context.contentResolver.openOutputStream(noteDoc.uri, "wt")?.use { os ->
+                                os.write(markdownText.toByteArray(Charsets.UTF_8))
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
 
             newFile
         } catch (e: Exception) {
@@ -193,6 +256,16 @@ class VaultFileManager(
                     file.delete()
                 }
                 prefs.edit().remove("note_md_path_$id").apply()
+            }
+
+            val treeUri = getVaultTreeUri()
+            if (treeUri != null) {
+                val rootDoc = DocumentFile.fromTreeUri(context, treeUri)
+                val fileName = relativePath?.substringAfterLast('/')
+                if (rootDoc != null && fileName != null) {
+                    val docFile = rootDoc.findFile(fileName)
+                    docFile?.delete()
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -364,7 +437,6 @@ class VaultFileManager(
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
 
         ZipOutputStream(FileOutputStream(zipFile)).use { zos ->
-            // 1. Add all notes as .md in their folders
             for (note in notes) {
                 val folderPrefix = if (note.folder.isNotBlank() && note.folder != "General") {
                     "${sanitizeFolderName(note.folder)}/"
@@ -392,7 +464,6 @@ class VaultFileManager(
                 zos.closeEntry()
             }
 
-            // 2. Add attachments
             for (att in attachments) {
                 val bytes = getDecryptedAttachmentBytes(att)
                 if (bytes != null) {
