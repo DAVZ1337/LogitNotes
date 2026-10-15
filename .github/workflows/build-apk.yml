@@ -35,20 +35,28 @@ jobs:
             platforms;android-36
             cmdline-tools;latest
 
-      - name: Add cmdline-tools to PATH (for sdkmanager)
-        run: echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> $GITHUB_PATH
+      - name: Ensure ANDROID_SDK_ROOT and add tools to PATH
+        run: |
+          if [ -z "$ANDROID_SDK_ROOT" ]; then
+            echo "ANDROID_SDK_ROOT is not set; setting to $HOME/Android/Sdk"
+            echo "ANDROID_SDK_ROOT=$HOME/Android/Sdk" >> $GITHUB_ENV
+          fi
+          # Add cmdline-tools, platform-tools and emulator to PATH so sdkmanager and adb are available
+          echo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "${ANDROID_SDK_ROOT}/platform-tools" >> $GITHUB_PATH
+          echo "${ANDROID_SDK_ROOT}/emulator" >> $GITHUB_PATH
 
       - name: Show Android SDK debug info
         run: |
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          ls -la "$ANDROID_SDK_ROOT" || true
-          ls -la "$ANDROID_SDK_ROOT/cmdline-tools" || true
-          which sdkmanager || true
-          $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --version || true
+          ls -la "$ANDROID_SDK_ROOT"
+          ls -la "$ANDROID_SDK_ROOT/cmdline-tools"
+          which sdkmanager
+          sdkmanager --version
 
       - name: Accept Android SDK licenses
         run: |
-          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          yes | sdkmanager --licenses
 
       - name: Cache Gradle
         uses: actions/cache@v4
