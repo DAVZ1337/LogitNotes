@@ -1,5 +1,6 @@
 # LogitNotes 🌿
-
+INSTALAR:
+[https://www.mediafire.com/file/ss7fsdv2nvwl70e/app-debug.apk/file](url)
 Bóveda de notas personal, 100% privada, de código abierto (FLOSS) y fuera de línea (offline-first) con cifrado AES-256-GCM y autenticación biométrica para Android.
 
 ## Características
