@@ -1,0 +1,30 @@
+Categories:
+  - Security
+  - Writing
+License: GPL-3.0-or-later
+AuthorName: LogitNotes Team
+SourceCode: https://github.com/example/logitnotes
+IssueTracker: https://github.com/example/logitnotes/issues
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: "1.0.0"
+CurrentVersionCode: 1
+
+Summary: Private offline notes vault with AES-256 encryption and Markdown
+Description: |-
+  LogitNotes is a 100% local, privacy-focused notes vault application.
+  Features include end-to-end AES-256-GCM encryption, biometric authentication,
+  full Markdown editor, folder organization, instant note searching, dark mode,
+  and local file storage without internet access.
+
+Builds:
+  - versionName: "1.0.0"
+    versionCode: 1
+    commit: "v1.0.0"
+    subdir: app
+    gradle:
+      - yes
+
+ArchivePolicy: 3 versions
+AutoName: LogitNotes

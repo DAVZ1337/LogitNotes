@@ -32,6 +32,9 @@ interface VaultDao {
     @Query("SELECT DISTINCT folder FROM notes WHERE isArchived = 0")
     fun getAllFoldersFlow(): Flow<List<String>>
 
+    @Query("UPDATE notes SET folder = :newFolder WHERE LOWER(folder) = LOWER(:oldFolder)")
+    suspend fun renameFolder(oldFolder: String, newFolder: String)
+
     // Attachments
     @Query("SELECT * FROM attachments WHERE noteId = :noteId ORDER BY createdAt ASC")
     fun getAttachmentsForNoteFlow(noteId: String): Flow<List<AttachmentEntity>>

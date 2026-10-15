@@ -25,9 +25,15 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            VaultNotesTheme(darkTheme = false) {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    VaultApp(activity = this@MainActivity)
+            val viewModel: VaultViewModel = viewModel()
+            val isDarkMode by viewModel.isDarkMode.collectAsState()
+
+            VaultNotesTheme(darkTheme = isDarkMode) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.background
+                ) {
+                    VaultApp(activity = this@MainActivity, viewModel = viewModel)
                 }
             }
         }

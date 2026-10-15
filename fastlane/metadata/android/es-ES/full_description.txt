@@ -1,10 +1,11 @@
-LogitNotes es una aplicación de notas y bóveda personal completamente privada, de código abierto y fuera de línea (offline-first).
+LogitNotes es una bóveda de notas privada, 100% local y segura con cifrado de grado militar AES-256-GCM.
 
-Características destacadas:
-- 100% Almacenamiento Local: Tus datos nunca salen de tu dispositivo. Sin cuentas externas ni rastreadores.
-- Cifrado Militar de Extremo a Extremo: Todas las notas y archivos adjuntos se cifran mediante AES-256-GCM con claves derivadas usando PBKDF2 (100.000 iteraciones).
-- Autenticación Biométrica Nativa: Protege el acceso mediante huella dactilar o reconocimiento facial a través del BiometricPrompt nativo de Android.
-- Markdown Completo: Editor y visualizador compatible con formato Markdown estándar (.md), listas de tareas, encabezados y estilos.
-- Archivos Adjuntos: Adjunta imágenes y documentos cifrados directamente dentro de cada nota.
-- Copia de Seguridad y Exportación: Exporta tus notas en formato .md estándar o genera un archivo ZIP de la bóveda completa.
-- Sin contraseñas por defecto: Cada usuario define su propia contraseña maestra al iniciar por primera vez.
+Características principales:
+• Cero Red y Cero Rastreo: Sin analíticas, sin telemetría y sin necesidad de permiso de internet. Toda tu información se queda exclusivamente en tu dispositivo.
+• Cifrado Extremo a Extremo: Tus notas y archivos adjuntos se protegen mediante AES-256-GCM con derivación de claves PBKDF2 (100.000 iteraciones).
+• Seguridad Biométrica y PIN: Desbloqueo rápido por huella digital o PIN numérico personal con bloqueo automático.
+• Editor Markdown Completo: Edición ágil con vista previa en vivo, encabezados, negrita, cursiva, listas de tareas, citas y código.
+• Organización Total: Carpetas personalizables (incluyendo renombrado de carpetas importadas), etiquetas, notas fijadas y buscador instantáneo de notas.
+• Modo Oscuro y Claro: Diseño cálido minimalista con selector rápido de modo oscuro.
+• Formatos Abiertos: Exportación e importación directa en archivos Markdown (.md) estándar y copias de seguridad en ZIP.
+• Optimizado para Batería y Memoria RAM: Caché inteligente en memoria y escritura eficiente en disco.

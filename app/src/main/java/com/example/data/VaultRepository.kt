@@ -23,12 +23,42 @@ class VaultRepository(
     val cryptoManager: CryptoManager,
     val fileManager: VaultFileManager
 ) {
+    private data class CachedNote(
+        val updatedAt: Long,
+        val encryptedTitleHash: Int,
+        val encryptedContentHash: Int,
+        val folder: String,
+        val note: Note
+    )
+    private val decryptedNotesCache = java.util.concurrent.ConcurrentHashMap<String, CachedNote>()
+
+    fun clearDecryptedCache() {
+        decryptedNotesCache.clear()
+        deletedNoteIds.clear()
+    }
+
+    fun invalidateNoteCache(noteId: String) {
+        decryptedNotesCache.remove(noteId)
+    }
+
+    fun invalidateFolderCache(folder: String) {
+        val iterator = decryptedNotesCache.entries.iterator()
+        while (iterator.hasNext()) {
+            val entry = iterator.next()
+            if (entry.value.folder.equals(folder, ignoreCase = true)) {
+                iterator.remove()
+            }
+        }
+    }
+
     /**
      * Returns flow of decrypted active notes. If locked, returns empty list.
+     * Uses memory cache to avoid expensive AES-256 GCM re-decryption on every emission.
      */
     fun getDecryptedNotesFlow(): Flow<List<Note>> {
         return dao.getAllActiveNotesFlow().map { entities ->
             if (!cryptoManager.isUnlocked) {
+                decryptedNotesCache.clear()
                 emptyList()
             } else {
                 val attachmentsByNote = try {
@@ -37,7 +67,32 @@ class VaultRepository(
                     emptyMap()
                 }
 
+                // Evict notes from cache that are no longer active
+                val activeIds = entities.map { it.id }.toSet()
+                decryptedNotesCache.keys.retainAll(activeIds)
+
                 entities.mapNotNull { entity ->
+                    if (deletedNoteIds.contains(entity.id)) return@mapNotNull null
+
+                    val titleHash = entity.encryptedTitle.hashCode()
+                    val contentHash = entity.encryptedContent.hashCode()
+                    val cached = decryptedNotesCache[entity.id]
+
+                    if (cached != null &&
+                        cached.updatedAt == entity.updatedAt &&
+                        cached.encryptedTitleHash == titleHash &&
+                        cached.encryptedContentHash == contentHash &&
+                        cached.folder == entity.folder
+                    ) {
+                        val count = attachmentsByNote[entity.id]?.size ?: 0
+                        if (cached.note.attachmentsCount == count &&
+                            cached.note.isPinned == entity.isPinned &&
+                            cached.note.isArchived == entity.isArchived
+                        ) {
+                            return@mapNotNull cached.note
+                        }
+                    }
+
                     try {
                         val title = cryptoManager.decryptString(entity.encryptedTitle)
                         val content = cryptoManager.decryptString(entity.encryptedContent)
@@ -47,7 +102,7 @@ class VaultRepository(
 
                         val count = attachmentsByNote[entity.id]?.size ?: 0
 
-                        Note(
+                        val note = Note(
                             id = entity.id,
                             title = title,
                             content = content,
@@ -59,6 +114,14 @@ class VaultRepository(
                             isArchived = entity.isArchived,
                             attachmentsCount = count
                         )
+                        decryptedNotesCache[entity.id] = CachedNote(
+                            updatedAt = entity.updatedAt,
+                            encryptedTitleHash = titleHash,
+                            encryptedContentHash = contentHash,
+                            folder = entity.folder,
+                            note = note
+                        )
+                        note
                     } catch (e: Exception) {
                         e.printStackTrace()
                         null
@@ -97,6 +160,8 @@ class VaultRepository(
         }
     }
 
+    private val deletedNoteIds = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
     suspend fun saveNote(
         id: String?,
         title: String,
@@ -105,7 +170,12 @@ class VaultRepository(
         tags: List<String>,
         isPinned: Boolean = false
     ): String = withContext(Dispatchers.IO) {
+        if (id != null && deletedNoteIds.contains(id)) {
+            // Note has been marked as deleted; reject saving
+            return@withContext id
+        }
         val noteId = id ?: UUID.randomUUID().toString()
+        deletedNoteIds.remove(noteId)
         val now = System.currentTimeMillis()
 
         val encTitle = cryptoManager.encryptString(title.ifBlank { "Sin título" })
@@ -151,13 +221,27 @@ class VaultRepository(
     }
 
     suspend fun deleteNote(noteId: String) = withContext(Dispatchers.IO) {
+        deletedNoteIds.add(noteId)
+        decryptedNotesCache.remove(noteId)
         val entity = dao.getNoteById(noteId)
-        if (entity != null) {
-            fileManager.deleteNoteMarkdownFile(noteId)
-            fileManager.deleteEncryptedNoteFile(noteId, entity.folder)
+        val folder = entity?.folder
+        val title = entity?.let {
+            try { cryptoManager.decryptString(it.encryptedTitle) } catch (_: Exception) { null }
         }
         dao.deleteNoteById(noteId)
         dao.deleteAllAttachmentsForNote(noteId)
+        fileManager.deleteNoteMarkdownFile(noteId, folder, title)
+        fileManager.deleteEncryptedNoteFile(noteId, folder ?: "")
+    }
+
+    suspend fun renameFolder(oldFolder: String, newFolder: String) = withContext(Dispatchers.IO) {
+        val cleanOld = oldFolder.trim()
+        val cleanNew = newFolder.trim()
+        if (cleanOld.isBlank() || cleanNew.isBlank() || cleanOld.equals(cleanNew, ignoreCase = true)) return@withContext
+        invalidateFolderCache(cleanOld)
+        dao.renameFolder(cleanOld, cleanNew)
+        fileManager.renameFolder(cleanOld, cleanNew)
+        syncAllNotesToMarkdown()
     }
 
     suspend fun syncAllNotesToMarkdown() = withContext(Dispatchers.IO) {

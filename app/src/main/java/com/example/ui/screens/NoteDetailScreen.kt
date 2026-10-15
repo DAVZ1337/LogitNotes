@@ -136,11 +136,15 @@ fun NoteDetailScreen(
         }
     }
 
+    var isDeletedLocally by remember { mutableStateOf(false) }
+
     // Fast debounced automatic save (400ms)
     LaunchedEffect(title, content) {
-        if (title.isNotBlank() || content.isNotBlank()) {
+        if (!isDeletedLocally && (title.isNotBlank() || content.isNotBlank())) {
             delay(400)
-            viewModel.saveCurrentNote()
+            if (!isDeletedLocally) {
+                viewModel.saveCurrentNote()
+            }
         }
     }
 
@@ -148,13 +152,15 @@ fun NoteDetailScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
+            if (!isDeletedLocally && (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP)) {
                 viewModel.saveCurrentNote()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
-            viewModel.saveCurrentNote()
+            if (!isDeletedLocally) {
+                viewModel.saveCurrentNote()
+            }
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
@@ -478,13 +484,15 @@ fun NoteDetailScreen(
 
     // BackHandler to auto-save note and return to list
     BackHandler {
-        viewModel.saveCurrentNote()
+        if (!isDeletedLocally) {
+            viewModel.saveCurrentNote()
+        }
         viewModel.navigateTo(VaultViewModel.Screen.VaultList)
     }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = com.example.ui.theme.CanvasBgWarm,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
@@ -552,7 +560,9 @@ fun NoteDetailScreen(
                 navigationIcon = {
                     IconButton(
                         onClick = {
-                            viewModel.saveCurrentNote()
+                            if (!isDeletedLocally) {
+                                viewModel.saveCurrentNote()
+                            }
                             viewModel.navigateTo(VaultViewModel.Screen.VaultList)
                         },
                         modifier = Modifier.testTag("back_button")
@@ -970,6 +980,7 @@ fun NoteDetailScreen(
             confirmButton = {
                 Button(
                     onClick = {
+                        isDeletedLocally = true
                         showDeleteConfirm = false
                         viewModel.deleteCurrentNote()
                     },

@@ -245,10 +245,11 @@ class VaultFileManager(
     }
 
     /**
-     * Deletes the Markdown file corresponding to the note
+     * Deletes the Markdown file corresponding to the note across all folders and SAF storage
      */
-    fun deleteNoteMarkdownFile(id: String) {
+    fun deleteNoteMarkdownFile(id: String, folder: String? = null, title: String? = null) {
         try {
+            // 1. Delete by saved relative path
             val relativePath = prefs.getString("note_md_path_$id", null)
             if (relativePath != null) {
                 val file = File(vaultDir, relativePath)
@@ -258,15 +259,119 @@ class VaultFileManager(
                 prefs.edit().remove("note_md_path_$id").apply()
             }
 
+            // 2. Check in specific folder directory if given
+            if (folder != null) {
+                val folderDir = File(vaultDir, sanitizeFolderName(folder))
+                if (folderDir.exists()) {
+                    if (title != null) {
+                        val titleFile = File(folderDir, "${sanitizeFileName(title)}.md")
+                        if (titleFile.exists()) titleFile.delete()
+                    }
+                    val idFile = File(folderDir, "nota_${id.take(6)}.md")
+                    if (idFile.exists()) idFile.delete()
+                }
+            }
+
+            // 3. Check in root vaultDir
+            if (title != null) {
+                val rootTitle = File(vaultDir, "${sanitizeFileName(title)}.md")
+                if (rootTitle.exists()) rootTitle.delete()
+            }
+            val rootId = File(vaultDir, "nota_${id.take(6)}.md")
+            if (rootId.exists()) rootId.delete()
+
+            // 4. Scan all subdirectories in vaultDir in case it was in another folder or imported
+            vaultDir.listFiles()?.forEach { sub ->
+                if (sub.isDirectory && sub.name != ".encrypted" && sub.name != ".attachments") {
+                    if (title != null) {
+                        val titleFile = File(sub, "${sanitizeFileName(title)}.md")
+                        if (titleFile.exists()) titleFile.delete()
+                    }
+                    val idFile = File(sub, "nota_${id.take(6)}.md")
+                    if (idFile.exists()) idFile.delete()
+                }
+            }
+
+            // 5. Delete from external SAF Tree if configured
             val treeUri = getVaultTreeUri()
             if (treeUri != null) {
                 val rootDoc = DocumentFile.fromTreeUri(context, treeUri)
                 val fileName = relativePath?.substringAfterLast('/')
-                if (rootDoc != null && fileName != null) {
-                    val docFile = rootDoc.findFile(fileName)
-                    docFile?.delete()
+                    ?: (title?.let { "${sanitizeFileName(it)}.md" } ?: "nota_${id.take(6)}.md")
+                if (rootDoc != null && rootDoc.canWrite()) {
+                    rootDoc.findFile(fileName)?.delete()
+                    if (title != null) rootDoc.findFile("${sanitizeFileName(title)}.md")?.delete()
+                    rootDoc.findFile("nota_${id.take(6)}.md")?.delete()
+
+                    if (folder != null) {
+                        val subDoc = rootDoc.findFile(sanitizeFolderName(folder))
+                        if (subDoc != null && subDoc.isDirectory) {
+                            subDoc.findFile(fileName)?.delete()
+                            if (title != null) subDoc.findFile("${sanitizeFileName(title)}.md")?.delete()
+                            subDoc.findFile("nota_${id.take(6)}.md")?.delete()
+                        }
+                    }
+
+                    // Check all subdirectories
+                    rootDoc.listFiles().forEach { sub ->
+                        if (sub.isDirectory) {
+                            sub.findFile(fileName)?.delete()
+                            if (title != null) sub.findFile("${sanitizeFileName(title)}.md")?.delete()
+                            sub.findFile("nota_${id.take(6)}.md")?.delete()
+                        }
+                    }
                 }
             }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * Renames a folder in the storage directory and updates all note references
+     */
+    fun renameFolder(oldFolder: String, newFolder: String) {
+        try {
+            val oldSanitized = sanitizeFolderName(oldFolder)
+            val newSanitized = sanitizeFolderName(newFolder)
+            if (oldSanitized == newSanitized) return
+
+            val oldDir = File(vaultDir, oldSanitized)
+            val newDir = File(vaultDir, newSanitized)
+
+            if (oldDir.exists()) {
+                if (!newDir.exists()) {
+                    oldDir.renameTo(newDir)
+                } else {
+                    oldDir.listFiles()?.forEach { file ->
+                        val dest = File(newDir, file.name)
+                        file.renameTo(dest)
+                    }
+                    oldDir.delete()
+                }
+            }
+
+            // SAF Tree folder rename
+            val treeUri = getVaultTreeUri()
+            if (treeUri != null) {
+                val rootDoc = DocumentFile.fromTreeUri(context, treeUri)
+                val oldTreeDoc = rootDoc?.findFile(oldSanitized)
+                if (oldTreeDoc != null && oldTreeDoc.isDirectory) {
+                    oldTreeDoc.renameTo(newSanitized)
+                }
+            }
+
+            // Update cached relative paths in SharedPreferences
+            val allKeys = prefs.all.keys.filter { it.startsWith("note_md_path_") }
+            val editor = prefs.edit()
+            for (key in allKeys) {
+                val path = prefs.getString(key, null)
+                if (path != null && (path.startsWith("$oldSanitized/") || path.startsWith("$oldSanitized\\"))) {
+                    val updatedPath = path.replaceFirst(oldSanitized, newSanitized)
+                    editor.putString(key, updatedPath)
+                }
+            }
+            editor.apply()
         } catch (e: Exception) {
             e.printStackTrace()
         }

@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -93,6 +94,21 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     private val appPrefs = application.getSharedPreferences("vault_user_profile", Context.MODE_PRIVATE)
     private val _vaultOwnerName = MutableStateFlow(cryptoManager.vaultName)
     val vaultOwnerName: StateFlow<String> = _vaultOwnerName.asStateFlow()
+
+    // Dark Mode Theme State
+    private val _isDarkMode = MutableStateFlow(appPrefs.getBoolean("dark_mode_enabled", false))
+    val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
+
+    fun toggleDarkMode() {
+        val newMode = !_isDarkMode.value
+        _isDarkMode.value = newMode
+        appPrefs.edit().putBoolean("dark_mode_enabled", newMode).apply()
+    }
+
+    fun setDarkMode(enabled: Boolean) {
+        _isDarkMode.value = enabled
+        appPrefs.edit().putBoolean("dark_mode_enabled", enabled).apply()
+    }
 
     // Explicit folders created by user
     private val _customFolders = MutableStateFlow(
@@ -230,6 +246,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
 
     fun lockVault() {
         cryptoManager.lockVault()
+        repository.clearDecryptedCache()
         _isUnlocked.value = false
         _currentScreen.value = Screen.VaultList
         _editingNoteId.value = null
@@ -269,6 +286,48 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun renameFolder(oldFolder: String, newFolder: String) {
+        val cleanOld = oldFolder.trim()
+        val cleanNew = newFolder.trim()
+        if (cleanOld.isBlank() || cleanNew.isBlank() || cleanOld.equals(cleanNew, ignoreCase = true)) return
+
+        viewModelScope.launch {
+            _isSaving.value = true
+            repository.renameFolder(cleanOld, cleanNew)
+
+            val currentCustom = _customFolders.value.filterNot { it.equals(cleanOld, ignoreCase = true) }.toMutableList()
+            currentCustom.add(cleanNew)
+            val distinctUpdated = currentCustom.distinct()
+            _customFolders.value = distinctUpdated
+            appPrefs.edit().putString("custom_folders", distinctUpdated.joinToString(",")).apply()
+
+            if (_selectedFolder.value?.equals(cleanOld, ignoreCase = true) == true) {
+                _selectedFolder.value = cleanNew
+            }
+            if (_noteFolder.value.equals(cleanOld, ignoreCase = true)) {
+                _noteFolder.value = cleanNew
+            }
+            _isSaving.value = false
+            refreshVaultStats()
+            _statusMessage.value = "Carpeta renombrada a $cleanNew"
+        }
+    }
+
+    fun deleteFolder(folderName: String) {
+        val clean = folderName.trim()
+        viewModelScope.launch {
+            repository.renameFolder(clean, "General")
+            val currentCustom = _customFolders.value.filterNot { it.equals(clean, ignoreCase = true) }
+            _customFolders.value = currentCustom
+            appPrefs.edit().putString("custom_folders", currentCustom.joinToString(",")).apply()
+            if (_selectedFolder.value.equals(clean, ignoreCase = true)) {
+                _selectedFolder.value = null
+            }
+            refreshVaultStats()
+            _statusMessage.value = "Carpeta eliminada (notas movidas a General)"
+        }
+    }
+
     fun selectFolder(folder: String?) {
         _selectedFolder.value = folder
     }
@@ -277,8 +336,11 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         _selectedTag.value = if (_selectedTag.value == tag) null else tag
     }
 
+    private var isDeletingNote = false
+
     // Note Editing
     private fun loadNote(noteId: String?) {
+        isDeletingNote = false
         _editingNoteId.value = noteId
         _isPreviewMode.value = false
         if (noteId == null) {
@@ -337,23 +399,36 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
         _isPreviewMode.value = !_isPreviewMode.value
     }
 
-    fun saveCurrentNote() {
-        if (!_isUnlocked.value) return
-        val title = _noteTitle.value.ifBlank { "Nota sin título" }
-        val content = _noteContent.value
+    private var saveJob: kotlinx.coroutines.Job? = null
 
-        viewModelScope.launch {
+    fun saveCurrentNote() {
+        if (!_isUnlocked.value || isDeletingNote) return
+        val title = _noteTitle.value.trim()
+        val content = _noteContent.value
+        // If both title and content are blank, don't persist an empty note
+        if (title.isBlank() && content.isBlank()) return
+        val finalTitle = title.ifBlank { "Nota sin título" }
+
+        val currentId = _editingNoteId.value
+        val currentFolder = _noteFolder.value
+        val currentTags = _noteTags.value
+        val isPinned = _noteIsPinned.value
+
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch {
             _isSaving.value = true
             val savedId = repository.saveNote(
-                id = _editingNoteId.value,
-                title = title,
+                id = currentId,
+                title = finalTitle,
                 content = content,
-                folder = _noteFolder.value,
-                tags = _noteTags.value,
-                isPinned = _noteIsPinned.value
+                folder = currentFolder,
+                tags = currentTags,
+                isPinned = isPinned
             )
-            _editingNoteId.value = savedId
-            _lastSavedTime.value = System.currentTimeMillis()
+            if (!isDeletingNote && isActive) {
+                _editingNoteId.value = savedId
+                _lastSavedTime.value = System.currentTimeMillis()
+            }
             _isSaving.value = false
             refreshVaultStats()
         }
@@ -382,12 +457,39 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteCurrentNote() {
-        val id = _editingNoteId.value ?: return
-        viewModelScope.launch {
-            repository.deleteNote(id)
-            refreshVaultStats()
-            _currentScreen.value = Screen.VaultList
+        isDeletingNote = true
+        saveJob?.cancel()
+        val id = _editingNoteId.value
+        _editingNoteId.value = null
+        _noteTitle.value = ""
+        _noteContent.value = ""
+        _currentScreen.value = Screen.VaultList
+        if (id != null) {
+            viewModelScope.launch {
+                repository.deleteNote(id)
+                refreshVaultStats()
+                _statusMessage.value = "Nota eliminada"
+                isDeletingNote = false
+            }
+        } else {
+            isDeletingNote = false
+        }
+    }
+
+    fun deleteNote(noteId: String) {
+        if (_editingNoteId.value == noteId) {
+            isDeletingNote = true
+            saveJob?.cancel()
             _editingNoteId.value = null
+            _noteTitle.value = ""
+            _noteContent.value = ""
+            _currentScreen.value = Screen.VaultList
+        }
+        viewModelScope.launch {
+            repository.deleteNote(noteId)
+            refreshVaultStats()
+            _statusMessage.value = "Nota eliminada"
+            isDeletingNote = false
         }
     }
 

@@ -31,8 +31,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
@@ -80,6 +84,7 @@ import com.example.ui.theme.BorderSubtleWarm
 import com.example.ui.theme.CanvasBgWarm
 import com.example.ui.theme.EmeraldSecurity
 import com.example.ui.theme.FolderAmber
+import com.example.ui.theme.RoseError
 import com.example.ui.theme.SurfaceCardDashed
 import com.example.ui.theme.SurfaceCardWhite
 import com.example.ui.theme.TextPrimaryDark
@@ -95,6 +100,7 @@ fun VaultListScreen(
     viewModel: VaultViewModel,
     modifier: Modifier = Modifier
 ) {
+    val isDarkMode by viewModel.isDarkMode.collectAsState()
     val notes by viewModel.filteredNotes.collectAsState()
     val allNotes by viewModel.allNotesFlow.collectAsState(initial = emptyList())
     val folders by viewModel.folders.collectAsState()
@@ -102,27 +108,41 @@ fun VaultListScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val vaultOwnerName by viewModel.vaultOwnerName.collectAsState()
 
+    var isSearchActive by remember { mutableStateOf(false) }
+
     var showNewFolderDialog by remember { mutableStateOf(false) }
     var newFolderNameInput by remember { mutableStateOf("") }
+
+    var showRenameFolderDialog by remember { mutableStateOf(false) }
+    var folderToRename by remember { mutableStateOf("") }
+    var renameFolderInput by remember { mutableStateOf("") }
+
+    var noteToDelete by remember { mutableStateOf<Note?>(null) }
 
     var showEditOwnerDialog by remember { mutableStateOf(false) }
     var newOwnerNameInput by remember { mutableStateOf(vaultOwnerName) }
 
     val scope = rememberCoroutineScope()
 
-    // Handle back button when inside a folder: return to root folder grid
-    BackHandler(enabled = selectedFolder != null) {
-        viewModel.selectFolder(null)
+    // Handle back button when inside a folder or when searching: return to root
+    BackHandler(enabled = selectedFolder != null || isSearchActive || searchQuery.isNotEmpty()) {
+        if (selectedFolder != null) {
+            viewModel.selectFolder(null)
+        } else if (searchQuery.isNotEmpty()) {
+            viewModel.setSearchQuery("")
+        } else if (isSearchActive) {
+            isSearchActive = false
+        }
     }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
-        containerColor = CanvasBgWarm,
+        containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { viewModel.navigateTo(VaultViewModel.Screen.NoteDetail(null)) },
-                containerColor = TextPrimaryDark,
-                contentColor = Color.White,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 shape = CircleShape,
                 modifier = Modifier.testTag("create_note_fab")
             ) {
@@ -140,9 +160,9 @@ fun VaultListScreen(
                     .padding(innerPadding)
                     .padding(horizontal = 20.dp),
                 contentPadding = PaddingValues(top = 28.dp, bottom = 80.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Header: "B Ó V E D A" + "David" and "🔒 Bloquear"
+                // Header: "L O G I T N O T E S" + "David" and Top Controls
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -163,7 +183,7 @@ fun VaultListScreen(
                                     letterSpacing = 3.sp,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = TextSecondaryMuted
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             )
                             Spacer(modifier = Modifier.height(4.dp))
@@ -172,51 +192,84 @@ fun VaultListScreen(
                                 style = MaterialTheme.typography.headlineLarge.copy(
                                     fontFamily = FontFamily.Serif,
                                     fontWeight = FontWeight.Normal,
-                                    fontSize = 42.sp,
-                                    color = TextPrimaryDark
+                                    fontSize = 38.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             )
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Minimalist Lupita (Search Toggle)
+                            IconButton(
+                                onClick = {
+                                    isSearchActive = !isSearchActive
+                                    if (!isSearchActive) viewModel.setSearchQuery("")
+                                },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .testTag("search_notes_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Search,
+                                    contentDescription = "Buscar notas",
+                                    tint = if (isSearchActive || searchQuery.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            // Minimalist Dark Mode Toggle (Preserves layout, toggles light/dark)
+                            IconButton(
+                                onClick = { viewModel.toggleDarkMode() },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .testTag("dark_mode_toggle")
+                            ) {
+                                Icon(
+                                    imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                    contentDescription = if (isDarkMode) "Cambiar a modo claro" else "Cambiar a modo oscuro",
+                                    tint = if (isDarkMode) FolderAmber else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
                             // Settings Button
                             IconButton(
                                 onClick = { viewModel.navigateTo(VaultViewModel.Screen.Settings) },
                                 modifier = Modifier
-                                    .padding(end = 6.dp)
-                                    .size(38.dp)
+                                    .padding(end = 4.dp)
+                                    .size(36.dp)
                                     .testTag("settings_button")
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
                                     contentDescription = "Ajustes",
-                                    tint = TextSecondaryMuted,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
 
-                            // "🔒 Bloquear" Pill Button (exact match to screenshot)
+                            // "🔒 Bloquear" Pill Button
                             Surface(
                                 modifier = Modifier
                                     .clip(CircleShape)
                                     .clickable { viewModel.lockVault() }
                                     .testTag("lock_vault_button"),
                                 shape = CircleShape,
-                                color = SurfaceCardWhite,
-                                border = BorderStroke(1.dp, BorderSubtleWarm)
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(text = "🔒", fontSize = 13.sp)
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(text = "🔒", fontSize = 12.sp)
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "Bloquear",
                                         style = MaterialTheme.typography.bodyMedium.copy(
                                             fontWeight = FontWeight.Medium,
-                                            fontSize = 14.sp,
-                                            color = TextPrimaryDark
+                                            fontSize = 13.sp,
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                     )
                                 }
@@ -225,10 +278,114 @@ fun VaultListScreen(
                     }
                 }
 
-                // 2-Column Grid of Folders (dvid, + Carpeta)
-                item {
-                    val folderList = folders
-                    val rowCount = (folderList.size + 1 + 1) / 2
+                // Minimalist Search Bar on Principal Screen
+                if (isSearchActive || searchQuery.isNotEmpty()) {
+                    item {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { viewModel.setSearchQuery(it) },
+                            placeholder = { Text("Buscar en toda la bóveda...", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp) },
+                            leadingIcon = {
+                                Icon(Icons.Default.Search, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                            },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.setSearchQuery("") }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Limpiar", modifier = Modifier.size(16.dp))
+                                    }
+                                } else {
+                                    IconButton(onClick = { isSearchActive = false }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Cerrar búsqueda", modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("main_notes_search_input"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = MaterialTheme.colorScheme.surface,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                            )
+                        )
+                    }
+                }
+
+                // If searching, display search results directly
+                if (searchQuery.isNotEmpty()) {
+                    val searchResults = allNotes.filter { note ->
+                        note.title.contains(searchQuery, ignoreCase = true) ||
+                                note.content.contains(searchQuery, ignoreCase = true) ||
+                                note.tags.any { it.contains(searchQuery, ignoreCase = true) } ||
+                                note.folder.contains(searchQuery, ignoreCase = true)
+                    }
+
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Resultados (${searchResults.size})",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            )
+                            TextButton(onClick = {
+                                viewModel.setSearchQuery("")
+                                isSearchActive = false
+                            }) {
+                                Text("Cerrar búsqueda", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                            }
+                        }
+                    }
+
+                    if (searchResults.isEmpty()) {
+                        item {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(text = "🔍", fontSize = 28.sp)
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "No se encontraron notas para \"$searchQuery\"",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        items(searchResults, key = { it.id }) { note ->
+                            NoteCardItem(
+                                note = note,
+                                onClick = { viewModel.navigateTo(VaultViewModel.Screen.NoteDetail(note.id)) },
+                                onTogglePin = {
+                                    scope.launch {
+                                        viewModel.repository.togglePinNote(note.id, note.isPinned)
+                                    }
+                                },
+                                onDelete = { noteToDelete = note }
+                            )
+                        }
+                    }
+                } else {
+                    // 2-Column Grid of Folders (dvid, + Carpeta)
+                    item {
+                        val folderList = folders
+                        val rowCount = (folderList.size + 1 + 1) / 2
 
                     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         for (r in 0 until rowCount) {
@@ -247,7 +404,12 @@ fun VaultListScreen(
                                         folderName = fName,
                                         noteCount = noteCount,
                                         modifier = Modifier.weight(1f),
-                                        onClick = { viewModel.selectFolder(fName) }
+                                        onClick = { viewModel.selectFolder(fName) },
+                                        onRename = {
+                                            folderToRename = fName
+                                            renameFolderInput = fName
+                                            showRenameFolderDialog = true
+                                        }
                                     )
                                 } else if (idx1 == folderList.size) {
                                     AddFolderCard(
@@ -269,7 +431,12 @@ fun VaultListScreen(
                                         folderName = fName,
                                         noteCount = noteCount,
                                         modifier = Modifier.weight(1f),
-                                        onClick = { viewModel.selectFolder(fName) }
+                                        onClick = { viewModel.selectFolder(fName) },
+                                        onRename = {
+                                            folderToRename = fName
+                                            renameFolderInput = fName
+                                            showRenameFolderDialog = true
+                                        }
                                     )
                                 } else if (idx2 == folderList.size) {
                                     AddFolderCard(
@@ -296,7 +463,7 @@ fun VaultListScreen(
                             text = "Todas las notas (${allNotes.size})",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = TextPrimaryDark
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                         )
                     }
@@ -309,12 +476,14 @@ fun VaultListScreen(
                                 scope.launch {
                                     viewModel.repository.togglePinNote(note.id, note.isPinned)
                                 }
-                            }
+                            },
+                            onDelete = { noteToDelete = note }
                         )
                     }
                 }
             }
-        } else {
+        }
+    } else {
             // ==========================================
             // INSIDE FOLDER VIEW
             // ==========================================
@@ -346,7 +515,7 @@ fun VaultListScreen(
                             )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "B Ó V E D A",
                                 style = MaterialTheme.typography.labelSmall.copy(
@@ -355,14 +524,32 @@ fun VaultListScreen(
                                     color = TextSecondaryMuted
                                 )
                             )
-                            Text(
-                                text = currentFolder,
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontFamily = FontFamily.Serif,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = TextPrimaryDark
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = currentFolder,
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        fontFamily = FontFamily.Serif,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TextPrimaryDark
+                                    )
                                 )
-                            )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                IconButton(
+                                    onClick = {
+                                        folderToRename = currentFolder
+                                        renameFolderInput = currentFolder
+                                        showRenameFolderDialog = true
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Renombrar carpeta",
+                                        tint = TextSecondaryMuted,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -379,7 +566,7 @@ fun VaultListScreen(
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
                                 IconButton(onClick = { viewModel.setSearchQuery("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "Limpiar")
+                                    Icon(Icons.Default.Close, contentDescription = "Limpiar")
                                 }
                             }
                         },
@@ -389,10 +576,10 @@ fun VaultListScreen(
                             .testTag("folder_search_input"),
                         shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = SurfaceCardWhite,
-                            unfocusedContainerColor = SurfaceCardWhite,
-                            focusedBorderColor = TextPrimaryDark,
-                            unfocusedBorderColor = BorderSubtleWarm
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
                         )
                     )
                 }
@@ -430,7 +617,8 @@ fun VaultListScreen(
                                 scope.launch {
                                     viewModel.repository.togglePinNote(note.id, note.isPinned)
                                 }
-                            }
+                            },
+                            onDelete = { noteToDelete = note }
                         )
                     }
                 }
@@ -474,6 +662,102 @@ fun VaultListScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showNewFolderDialog = false }) {
+                    Text("Cancelar", color = TextSecondaryMuted)
+                }
+            }
+        )
+    }
+
+    // Dialog to Rename Any Folder (including imported ones)
+    if (showRenameFolderDialog) {
+        AlertDialog(
+            onDismissRequest = { showRenameFolderDialog = false },
+            title = {
+                Text(
+                    text = "Renombrar Carpeta",
+                    style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Introduce el nuevo nombre para la carpeta \"$folderToRename\":",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextSecondaryMuted
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = renameFolderInput,
+                        onValueChange = { renameFolderInput = it },
+                        placeholder = { Text("Nombre de la carpeta") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("rename_folder_input"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = TextPrimaryDark,
+                            unfocusedBorderColor = BorderSubtleWarm
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val clean = renameFolderInput.trim()
+                        if (clean.isNotBlank()) {
+                            viewModel.renameFolder(folderToRename, clean)
+                        }
+                        showRenameFolderDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = TextPrimaryDark),
+                    modifier = Modifier.testTag("confirm_rename_folder_btn")
+                ) {
+                    Text("Renombrar", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameFolderDialog = false }) {
+                    Text("Cancelar", color = TextSecondaryMuted)
+                }
+            }
+        )
+    }
+
+    // Dialog to Delete Note (from list or inside any folder)
+    if (noteToDelete != null) {
+        val targetNote = noteToDelete!!
+        AlertDialog(
+            onDismissRequest = { noteToDelete = null },
+            title = {
+                Text(
+                    text = "Eliminar nota",
+                    style = MaterialTheme.typography.titleLarge.copy(fontFamily = FontFamily.Serif, fontWeight = FontWeight.Bold)
+                )
+            },
+            text = {
+                Text(
+                    text = "¿Seguro que deseas eliminar permanentemente la nota \"${targetNote.title.ifBlank { "Sin título" }}\"? Se borrará de la carpeta \"${targetNote.folder}\" y de los archivos del dispositivo.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextPrimaryDark
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val idToDelete = targetNote.id
+                        noteToDelete = null
+                        viewModel.deleteNote(idToDelete)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = RoseError),
+                    modifier = Modifier.testTag("confirm_delete_note_btn")
+                ) {
+                    Text("Eliminar", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { noteToDelete = null }) {
                     Text("Cancelar", color = TextSecondaryMuted)
                 }
             }
@@ -524,14 +808,15 @@ fun VaultListScreen(
 }
 
 /**
- * Solid White Folder Card with Yellow 📁 Icon, Title, and Note Count (Matches Screenshot)
+ * Solid White Folder Card with Yellow 📁 Icon, Title, Rename Button, and Note Count
  */
 @Composable
 fun FolderCard(
     folderName: String,
     noteCount: Int,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onRename: () -> Unit
 ) {
     Surface(
         modifier = modifier
@@ -540,20 +825,39 @@ fun FolderCard(
             .clickable { onClick() }
             .testTag("folder_card_$folderName"),
         shape = RoundedCornerShape(20.dp),
-        color = SurfaceCardWhite,
-        border = BorderStroke(1.dp, BorderSubtleWarm)
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(18.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.Start
         ) {
-            Text(
-                text = "📁",
-                fontSize = 32.sp
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "📁",
+                    fontSize = 30.sp
+                )
+                IconButton(
+                    onClick = onRename,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .testTag("rename_folder_${folderName}_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Renombrar carpeta",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
 
             Column {
                 Text(
@@ -561,7 +865,7 @@ fun FolderCard(
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 17.sp,
-                        color = TextPrimaryDark
+                        color = MaterialTheme.colorScheme.onSurface
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -571,7 +875,7 @@ fun FolderCard(
                     text = "$noteCount notas",
                     style = MaterialTheme.typography.bodySmall.copy(
                         fontSize = 13.sp,
-                        color = TextSecondaryMuted
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 )
             }
@@ -594,8 +898,8 @@ fun AddFolderCard(
             .clickable { onClick() }
             .testTag("add_folder_card"),
         shape = RoundedCornerShape(20.dp),
-        color = CanvasBgWarm.copy(alpha = 0.5f),
-        border = BorderStroke(1.dp, BorderDashedWarm)
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
     ) {
         Box(
             modifier = Modifier.fillMaxSize(),
@@ -606,7 +910,7 @@ fun AddFolderCard(
                 style = MaterialTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.Normal,
                     fontSize = 15.sp,
-                    color = TextSecondaryMuted
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             )
         }
@@ -621,7 +925,8 @@ fun AddFolderCard(
 private fun NoteCardItem(
     note: Note,
     onClick: () -> Unit,
-    onTogglePin: () -> Unit
+    onTogglePin: () -> Unit,
+    onDelete: () -> Unit
 ) {
     val dateFormat = SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault())
     val dateStr = dateFormat.format(Date(note.updatedAt))
@@ -633,10 +938,10 @@ private fun NoteCardItem(
             .clickable { onClick() }
             .testTag("note_card_${note.id.take(6)}"),
         shape = RoundedCornerShape(16.dp),
-        color = SurfaceCardWhite,
+        color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             1.dp,
-            if (note.isPinned) FolderAmber else BorderSubtleWarm
+            if (note.isPinned) FolderAmber else MaterialTheme.colorScheme.outline
         )
     ) {
         Column(
@@ -652,14 +957,14 @@ private fun NoteCardItem(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         shape = RoundedCornerShape(6.dp),
-                        color = CanvasBgWarm
+                        color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Text(
                             text = note.folder,
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 11.sp,
-                                color = TextSecondaryMuted
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             ),
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                         )
@@ -671,13 +976,13 @@ private fun NoteCardItem(
                             Icon(
                                 imageVector = Icons.Default.AttachFile,
                                 contentDescription = null,
-                                tint = TextSecondaryMuted,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(13.dp)
                             )
                             Text(
                                 text = "${note.attachmentsCount}",
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                                color = TextSecondaryMuted
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -687,16 +992,31 @@ private fun NoteCardItem(
                     Text(
                         text = dateStr,
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                        color = TextSecondaryMuted
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     IconButton(
                         onClick = onTogglePin,
-                        modifier = Modifier.size(26.dp)
+                        modifier = Modifier
+                            .size(28.dp)
+                            .testTag("pin_note_${note.id.take(6)}")
                     ) {
                         Icon(
                             imageVector = if (note.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
                             contentDescription = if (note.isPinned) "Desfijar" else "Fijar",
-                            tint = if (note.isPinned) FolderAmber else TextSecondaryMuted.copy(alpha = 0.4f),
+                            tint = if (note.isPinned) FolderAmber else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .testTag("delete_note_${note.id.take(6)}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Eliminar nota",
+                            tint = RoseError.copy(alpha = 0.75f),
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -709,7 +1029,7 @@ private fun NoteCardItem(
                 text = note.title,
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
-                    color = TextPrimaryDark
+                    color = MaterialTheme.colorScheme.onSurface
                 ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -720,7 +1040,7 @@ private fun NoteCardItem(
                 Text(
                     text = note.previewSnippet,
                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp),
-                    color = TextSecondaryMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -737,11 +1057,11 @@ private fun NoteCardItem(
                             text = "#$tag",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.Medium,
-                                fontSize = 11.sp
+                                fontSize = 11.sp,
                             ),
-                            color = TextSecondaryMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
-                                .background(CanvasBgWarm, RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
