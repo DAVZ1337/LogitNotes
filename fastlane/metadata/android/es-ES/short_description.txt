@@ -1,1 +1,1 @@
-Bóveda de notas 100% local con cifrado AES-256, biometría y Markdown.
+Bóveda de notas cifrada 100% local con AES-256 GCM, biometría y Markdown.

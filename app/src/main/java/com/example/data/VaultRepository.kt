@@ -228,6 +228,9 @@ class VaultRepository(
         val title = entity?.let {
             try { cryptoManager.decryptString(it.encryptedTitle) } catch (_: Exception) { null }
         }
+        if (entity != null) {
+            dao.deleteNote(entity)
+        }
         dao.deleteNoteById(noteId)
         dao.deleteAllAttachmentsForNote(noteId)
         fileManager.deleteNoteMarkdownFile(noteId, folder, title)
@@ -238,8 +241,8 @@ class VaultRepository(
         val cleanOld = oldFolder.trim()
         val cleanNew = newFolder.trim()
         if (cleanOld.isBlank() || cleanNew.isBlank() || cleanOld.equals(cleanNew, ignoreCase = true)) return@withContext
-        invalidateFolderCache(cleanOld)
-        dao.renameFolder(cleanOld, cleanNew)
+        decryptedNotesCache.clear()
+        dao.renameFolder(cleanOld, cleanNew, System.currentTimeMillis())
         fileManager.renameFolder(cleanOld, cleanNew)
         syncAllNotesToMarkdown()
     }

@@ -1,11 +1,11 @@
-LogitNotes es una bóveda de notas privada, 100% local y segura con cifrado de grado militar AES-256-GCM.
+LogitNotes es una aplicación de notas y bóveda personal diseñada con privacidad absoluta desde sus cimientos:
 
-Características principales:
-• Cero Red y Cero Rastreo: Sin analíticas, sin telemetría y sin necesidad de permiso de internet. Toda tu información se queda exclusivamente en tu dispositivo.
-• Cifrado Extremo a Extremo: Tus notas y archivos adjuntos se protegen mediante AES-256-GCM con derivación de claves PBKDF2 (100.000 iteraciones).
-• Seguridad Biométrica y PIN: Desbloqueo rápido por huella digital o PIN numérico personal con bloqueo automático.
-• Editor Markdown Completo: Edición ágil con vista previa en vivo, encabezados, negrita, cursiva, listas de tareas, citas y código.
-• Organización Total: Carpetas personalizables (incluyendo renombrado de carpetas importadas), etiquetas, notas fijadas y buscador instantáneo de notas.
-• Modo Oscuro y Claro: Diseño cálido minimalista con selector rápido de modo oscuro.
-• Formatos Abiertos: Exportación e importación directa en archivos Markdown (.md) estándar y copias de seguridad en ZIP.
-• Optimizado para Batería y Memoria RAM: Caché inteligente en memoria y escritura eficiente en disco.
+• 100% Fuera de Línea y Local: Sin servidores, sin cuentas en la nube, sin rastreo ni telemetría. La aplicación no solicita permiso de acceso a Internet.
+• Cifrado Militar AES-256 GCM: Tus notas, títulos, contenidos y archivos adjuntos se cifran en reposo con claves gestionadas de forma segura.
+• Autenticación Biométrica y PIN: Desbloqueo rápido y seguro mediante huella dactilar, reconocimiento facial o PIN seguro.
+• Organización en Carpetas y Etiquetas: Organiza tus notas en carpetas personalizadas, renombra cualquier carpeta libremente y clasifica con etiquetas (#tags).
+• Búsqueda Rápida y Minimalista: Encuentra al instante cualquier nota por título, contenido o etiquetas con la nueva lupita minimalista en la pantalla principal.
+• Modo Oscuro y Claro: Selector de modo oscuro con paleta cálida que cuida tus ojos y ahorra batería.
+• Editor Markdown con Vista Previa en Vivo: Formato enriquecido con negrita, cursiva, listas, listas de verificación interactivas, código y citas.
+• Exportación e Importación: Exporta tus notas en formato Markdown estándar (.md) o realiza copias de seguridad completas en formato ZIP.
+• Optimizado para Rendimiento: Bajo consumo de memoria RAM y eficiencia de batería gracias al almacenamiento en caché inteligente y Room SQLite.

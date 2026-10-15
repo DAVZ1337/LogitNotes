@@ -1,11 +1,11 @@
-LogitNotes is a 100% local, privacy-respecting notes vault built with military-grade AES-256-GCM encryption.
+LogitNotes is a zero-trust, completely offline personal note-taking app and security vault:
 
-Key Features:
-• Zero Network / Zero Tracking: No analytics, no telemetry, no internet permission required. All data remains exclusively on your device.
-• End-to-End Encryption: Notes and attachments are encrypted with AES-256-GCM using PBKDF2 key derivation (100,000 iterations).
-• Biometric & PIN Security: Fast fingerprint/face unlock or custom numeric PIN with auto-lock security.
-• Markdown Power: Full Markdown editor with live preview, headings, bold, italics, quotes, code, checklists, and dividers.
-• Clean Organization: Folders, custom tags, pin important notes, and instant search across titles and content.
-• Dark & Light Modes: Warm minimal ivory theme with seamless warm dark mode toggle.
-• Open Formats: Direct export/import to standard Markdown (.md) and encrypted ZIP archives.
-• Battery & RAM Optimized: Highly efficient in-memory caching and debounced disk writes.
+• 100% Offline & Private: No cloud, no analytics, no external trackers. The app does not declare or request the INTERNET permission.
+• AES-256 GCM Encryption: Notes, titles, contents, and attachments are strongly encrypted on device.
+• Biometric & PIN Security: Secure your vault with fingerprint, face unlock, or Master PIN with automatic lock on pause.
+• Folders & Tag Taxonomy: Organize notes in folders with full renaming support and tag indexing.
+• Minimalist Search: Fast, inline search bar on the home screen to find notes across titles and content.
+• Dark & Light Modes: Warm dark theme designed to reduce eye strain and conserve OLED battery.
+• Live Markdown Editor: WYSIWYG live rendering, formatting toolbar, checklists, code blocks, and math/tables support.
+• Import & Export: Export directly to standard Markdown (.md) or whole-vault ZIP archives.
+• Battery & Memory Optimized: Memory-efficient decryption caching and lightweight SQLite storage.

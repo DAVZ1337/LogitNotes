@@ -338,10 +338,14 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
 
     private var isDeletingNote = false
 
+    private var loadNoteJob: kotlinx.coroutines.Job? = null
+
     // Note Editing
     private fun loadNote(noteId: String?) {
         isDeletingNote = false
-        _editingNoteId.value = noteId
+        loadNoteJob?.cancel()
+        val targetId = noteId ?: java.util.UUID.randomUUID().toString()
+        _editingNoteId.value = targetId
         _isPreviewMode.value = false
         if (noteId == null) {
             // New Note
@@ -352,7 +356,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
             _noteIsPinned.value = false
             _noteAttachments.value = emptyList()
         } else {
-            viewModelScope.launch {
+            loadNoteJob = viewModelScope.launch {
                 val note = repository.getDecryptedNoteById(noteId)
                 if (note != null) {
                     _noteTitle.value = note.title
@@ -459,6 +463,7 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteCurrentNote() {
         isDeletingNote = true
         saveJob?.cancel()
+        loadNoteJob?.cancel()
         val id = _editingNoteId.value
         _editingNoteId.value = null
         _noteTitle.value = ""
@@ -477,9 +482,10 @@ class VaultViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteNote(noteId: String) {
+        saveJob?.cancel()
+        loadNoteJob?.cancel()
         if (_editingNoteId.value == noteId) {
             isDeletingNote = true
-            saveJob?.cancel()
             _editingNoteId.value = null
             _noteTitle.value = ""
             _noteContent.value = ""
