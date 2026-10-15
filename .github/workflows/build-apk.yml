@@ -35,26 +35,26 @@ jobs:
             platforms;android-36
             cmdline-tools;latest
 
-      - name: Ensure ANDROID_SDK_ROOT and add tools to PATH
+      - name: Ensure Android SDK env and PATH
+        shell: bash
         run: |
-          if [ -z "$ANDROID_SDK_ROOT" ]; then
-            echo "ANDROID_SDK_ROOT is not set; setting to $HOME/Android/Sdk"
-            echo "ANDROID_SDK_ROOT=$HOME/Android/Sdk" >> $GITHUB_ENV
-          fi
-          # Add cmdline-tools, platform-tools and emulator to PATH so sdkmanager and adb are available
-          echo "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin" >> $GITHUB_PATH
-          echo "${ANDROID_SDK_ROOT}/platform-tools" >> $GITHUB_PATH
-          echo "${ANDROID_SDK_ROOT}/emulator" >> $GITHUB_PATH
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK_ROOT/platform-tools" >> "$GITHUB_PATH"
+          echo "$ANDROID_SDK_ROOT/emulator" >> "$GITHUB_PATH"
+          ls -la "$ANDROID_SDK_ROOT" || true
+          ls -la "$ANDROID_SDK_ROOT/cmdline-tools" || true
 
       - name: Show Android SDK debug info
+        shell: bash
         run: |
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          ls -la "$ANDROID_SDK_ROOT"
-          ls -la "$ANDROID_SDK_ROOT/cmdline-tools"
-          which sdkmanager
-          sdkmanager --version
+          which sdkmanager || true
+          sdkmanager --version || true
 
       - name: Accept Android SDK licenses
+        shell: bash
         run: |
           yes | sdkmanager --licenses
 
@@ -68,15 +68,25 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
-      - name: Prepare build environment (keystore and env files)
+      - name: Prepare build environment
+        shell: bash
         run: |
           touch .env
           if [ ! -f debug.keystore ]; then
-            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            keytool -genkey -v \
+              -keystore debug.keystore \
+              -storepass android \
+              -alias androiddebugkey \
+              -keypass android \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
           fi
           chmod +x ./gradlew
 
       - name: Build Debug APK
+        shell: bash
         run: |
           ./gradlew assembleDebug --stacktrace --no-daemon
 
