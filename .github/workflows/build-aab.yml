@@ -23,10 +23,16 @@ jobs:
       - name: Build Android App Bundle
         run: |
           chmod +x gradlew
-          ./gradlew bundleRelease
+          ./gradlew bundleRelease --stacktrace
+
+      - name: Find generated AAB
+        run: |
+          find . -type f -name "*.aab" -print
+          test -n "$(find . -type f -name '*.aab' -print -quit)"
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: android-app-bundle
           path: app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
