@@ -24,8 +24,18 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/my-upload-key.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/my-upload-key.jks"
           test -s "$RUNNER_TEMP/my-upload-key.jks"
+
+      - name: Validate signing key
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+        run: |
+          wc -c "$RUNNER_TEMP/my-upload-key.jks"
+          keytool -list \
+            -keystore "$RUNNER_TEMP/my-upload-key.jks" \
+            -alias upload \
+            -storepass "$STORE_PASSWORD"
 
       - name: Build signed Android App Bundle
         env:
