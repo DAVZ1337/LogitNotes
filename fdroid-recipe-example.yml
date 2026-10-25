@@ -25,7 +25,7 @@ Description: |-
   - Sin contraseñas por defecto: cada usuario define su propia clave maestra.
 
 RepoType: git
-Repo: https://github.com/REEMPLAZAR_USUARIO/REEMPLAZAR_REPO.git
+Repo: https://github.com/DAVZ1337/LogitNotes?utm_source=chatgpt.com
 
 Builds:
   - versionName: '1.0'
@@ -36,5 +36,5 @@ Builds:
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: '1.0'
+CurrentVersion: '2'
 CurrentVersionCode: 1
