@@ -5,9 +5,10 @@ Categories:
   - Security
   - Writing
 License: MIT
-WebSite: https://github.com/REEMPLAZAR_USUARIO/REEMPLAZAR_REPO
-SourceCode: https://github.com/REEMPLAZAR_USUARIO/REEMPLAZAR_REPO
-IssueTracker: https://github.com/REEMPLAZAR_USUARIO/REEMPLAZAR_REPO/issues
+WebSite: https://github.com/DAVZ1337/LogitNotes
+SourceCode: https://github.com/DAVZ1337/LogitNotes
+IssueTracker: https://github.com/DAVZ1337/LogitNotes/issues
+Repo: https://github.com/DAVZ1337/LogitNotes.git
 
 AutoName: LogitNotes
 Summary: Bóveda de notas 100% local y cifrada con biometría y Markdown
@@ -25,16 +26,15 @@ Description: |-
   - Sin contraseñas por defecto: cada usuario define su propia clave maestra.
 
 RepoType: git
-Repo: https://github.com/DAVZ1337/LogitNotes?utm_source=chatgpt.com
+Repo: https://github.com/DAVZ1337/LogitNotes.git
 
 Builds:
-  - versionName: '1.0'
-    versionCode: 1
-    commit: main
-    gradle:
-      - assembleRelease
+  - versionName: '1.1.0'
+    versionCode: 2
+    commit: '6d4f0e0e9ef2a93aa1d26646c13263192544658e'
+    gradle: yes
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: '2'
-CurrentVersionCode: 1
+CurrentVersion: '1.1.0'
+CurrentVersionCode: 2
